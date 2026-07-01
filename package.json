@@ -1,0 +1,11 @@
+{
+  "name": "profile-reply-strategy-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "画像驱动 AI 回评策略应用 Demo",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "license": "UNLICENSED"
+}
