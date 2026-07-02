@@ -92,7 +92,14 @@ GitHub 版本仅保留脱敏样例数据，方便任何人直接启动验证。
 商家：2000000001、2000000002
 ```
 
-如果公司内真实服务只能通过 Java/KRPC 调用，需要先起一个 Java HTTP Adapter，再让当前 Demo 转发过去：
+如果公司内真实服务只能通过 Java/KRPC 调用，需要先起一个 Java HTTP Adapter，再让当前 Demo 转发过去。本仓库已补一个可启动的 Adapter 骨架：
+
+```bash
+cd java-rpc-adapter
+sh start.sh
+```
+
+再启动前端 Demo：
 
 ```bash
 export QUERY_USER_PROFILE_HTTP_URL="http://127.0.0.1:8081/api/queryUserProfile"
@@ -131,9 +138,12 @@ python3 scripts/import_merchant_profiles.py \
 private KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService userProfileService;
 ```
 
-模板见：
+Adapter 工程见：
 
 ```text
-java-rpc-adapter/UserProfileQueryController.java
+java-rpc-adapter/pom.xml
+java-rpc-adapter/src/main/java/com/kuaishou/demo/profile/adapter/
 java-rpc-adapter/README.md
 ```
+
+默认 Adapter 使用 mock client，能先验证 HTTP 链路。真实接入时，只需要在 `KrpcUserProfileClient` 中按公司生成包名和注入方式补齐 `QueryUserProfile` 调用。

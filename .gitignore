@@ -1,0 +1,4 @@
+.DS_Store
+.m2-repository/
+target/
+java-rpc-adapter/target/

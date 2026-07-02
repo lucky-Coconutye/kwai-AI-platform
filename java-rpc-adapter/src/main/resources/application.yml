@@ -1,0 +1,18 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: profile-rpc-adapter
+
+profile:
+  adapter:
+    biz-code: business_platform
+    mock-enabled: true
+    krpc:
+      manual-enabled: false
+      biz-def: AD_INDUSTRY_INFRA_AIGC
+      biz-name: ad-industry-ai-studio-center
+      registry-name: ad-industry-ai-studio-center
+      port: 0
+      timeout-ms: 5000
