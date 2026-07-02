@@ -125,12 +125,12 @@ python3 scripts/import_merchant_profiles.py \
 <dependency>
   <groupId>kuaishou</groupId>
   <artifactId>ad-industry-ai-studio-center-parent</artifactId>
-  <version>1.0.232</version>
+  <version>1.0.234</version>
 </dependency>
 <dependency>
   <groupId>kuaishou</groupId>
   <artifactId>ad-industry-ai-studio-center-client</artifactId>
-  <version>1.0.232</version>
+  <version>1.0.234</version>
 </dependency>
 ```
 

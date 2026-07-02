@@ -10,7 +10,7 @@ profile:
     biz-code: business_platform
     mock-enabled: true
     krpc:
-      manual-enabled: false
+      manual-enabled: true
       biz-def: AD_INDUSTRY_INFRA_AIGC
       biz-name: ad-industry-ai-studio-center
       registry-name: ad-industry-ai-studio-center

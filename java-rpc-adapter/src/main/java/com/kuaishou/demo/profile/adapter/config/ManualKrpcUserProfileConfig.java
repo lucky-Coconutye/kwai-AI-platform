@@ -10,7 +10,6 @@ import java.time.Duration;
 import kuaishou.common.BizDef;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -19,9 +18,11 @@ import org.springframework.context.annotation.Profile;
 @Profile("krpc")
 public class ManualKrpcUserProfileConfig {
 
+    // In the standalone adapter, create the KRPC client by default when the krpc profile is active.
+    // If the company runtime already provides this bean, ConditionalOnMissingBean keeps that one.
+
     @Bean
     @ConditionalOnMissingBean(KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService.class)
-    @ConditionalOnProperty(prefix = "profile.adapter.krpc", name = "manual-enabled", havingValue = "true")
     public KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService userProfileService(
             @Value("${profile.adapter.krpc.biz-def:AD_INDUSTRY_INFRA_AIGC}") String bizDef,
             @Value("${profile.adapter.krpc.biz-name:ad-industry-ai-studio-center}") String bizName,

@@ -21,7 +21,7 @@
 
   <properties>
     <java.version>17</java.version>
-    <ad.industry.ai.studio.version>1.0.232</ad.industry.ai.studio.version>
+    <ad.industry.ai.studio.version>1.0.234</ad.industry.ai.studio.version>
   </properties>
 
   <dependencies>

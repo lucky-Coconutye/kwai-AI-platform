@@ -44,8 +44,12 @@ public class KrpcUserProfileClient implements UserProfileClient {
                 .setUserId(request.getUserId())
                 .build();
 
-        QueryUserProfileResponse rpcResponse = userProfileService.queryUserProfile(rpcRequest);
-        return toResponseMap(rpcResponse);
+        try {
+            QueryUserProfileResponse rpcResponse = userProfileService.queryUserProfile(rpcRequest);
+            return toResponseMap(rpcResponse);
+        } catch (Exception error) {
+            return rpcCallFailedResponse(request, error);
+        }
     }
 
     @Override
@@ -129,10 +133,26 @@ public class KrpcUserProfileClient implements UserProfileClient {
     }
 
     private Map<String, Object> missingServiceBeanResponse(QueryUserProfileHttpRequest request) {
+        return failedResponse(
+                request,
+                "KRPC_SERVICE_BEAN_MISSING",
+                "未找到 IAdAiStudioUserProfileService Bean。krpc profile 下 Adapter 会默认尝试创建该 Bean；如果仍失败，请检查 KRPC 依赖和 Spring 配置是否加载。"
+        );
+    }
+
+    private Map<String, Object> rpcCallFailedResponse(QueryUserProfileHttpRequest request, Exception error) {
+        return failedResponse(
+                request,
+                "KRPC_CALL_FAILED",
+                "已创建 IAdAiStudioUserProfileService Bean，但调用 QueryUserProfile 失败：" + error.getClass().getSimpleName() + ": " + error.getMessage()
+        );
+    }
+
+    private Map<String, Object> failedResponse(QueryUserProfileHttpRequest request, String code, String message) {
         Map<String, Object> baseResponse = new LinkedHashMap<>();
         baseResponse.put("result", false);
-        baseResponse.put("error_code", "KRPC_SERVICE_BEAN_MISSING");
-        baseResponse.put("error_message", "未找到 IAdAiStudioUserProfileService Bean。若公司框架不能自动注入，请配置 profile.adapter.krpc.manual-enabled=true，并补充 biz-name / registry-name / port 后重启 krpc profile。");
+        baseResponse.put("error_code", code);
+        baseResponse.put("error_message", message);
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("base_response", baseResponse);
