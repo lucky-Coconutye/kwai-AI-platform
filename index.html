@@ -3,249 +3,102 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>画像驱动 AI 回评策略工作台 Demo</title>
+    <title>画像资产平台</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app-layout">
-      <aside class="sidebar">
-        <div class="side-brand">
-          <div class="brand-mark">AI</div>
+    <aside class="sidebar">
+      <div class="logo">像</div>
+      <button class="side-item active" data-section="market"><span>市</span>画像市场</button>
+      <button class="side-item" data-section="user"><span>用</span>用户画像</button>
+      <button class="side-item" data-section="merchant"><span>商</span>商家画像</button>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div class="headline">
+          <div class="eyebrow">画像资产工作台</div>
+          <h1>画像资产平台</h1>
+          <p>基于用户画像底表与商家画像记录表，检索、查看和验证画像数据。</p>
+        </div>
+        <form class="global-search" id="searchForm">
+          <input id="keywordInput" type="search" placeholder="搜索用户ID、商家ID、行业、服务、兴趣" />
+          <button type="submit">搜索</button>
+        </form>
+      </header>
+
+      <section class="filters">
+        <div class="filters-head">
           <div>
-            <strong>AI 回评策略工作台</strong>
-            <span>画像转决策 Demo</span>
+            <h2>筛选条件</h2>
+            <p id="filterModeHint">按画像类型、标签和结构化画像字段筛选。</p>
+          </div>
+          <button type="button" id="resetFilters" class="reset-filters">重置筛选</button>
+        </div>
+        <div class="filter-group">
+          <span>画像类型</span>
+          <div class="inline-chips">
+            <button class="chip active" data-role="all">全部</button>
+            <button class="chip" data-role="2">用户画像</button>
+            <button class="chip" data-role="1">商家画像</button>
           </div>
         </div>
-
-        <nav class="side-nav">
-          <button class="active" data-view="overview">画像工作台</button>
-          <button data-view="profile">画像联动</button>
-          <button data-view="tasks">评论任务</button>
-          <button data-view="strategy">回评策略</button>
-          <button data-view="review">审核发布</button>
-        </nav>
-
-        <section class="side-card merchant-card">
-          <div class="side-card-title">当前商家</div>
-          <strong id="sideMerchantName">杭州某某汽车门店</strong>
-          <span id="sideMerchantMeta">汽车线索 · 灰度商家</span>
-        </section>
-      </aside>
-
-      <main class="main" data-view="overview">
-        <header class="topbar">
-          <div>
-            <h1 id="pageTitle">AI 回评策略工作台</h1>
-            <p id="pageDesc">底层画像表只提供上下文，平台负责把画像解析成回评策略和发布决策。</p>
+        <div class="filter-group">
+          <span id="tagFilterLabel">行业/标签</span>
+          <div class="inline-chips">
+            <button class="chip active" data-industry="all">全部</button>
+            <div id="industryChips" class="dynamic-chips"></div>
           </div>
-          <div class="header-actions">
-            <button class="primary-btn" id="runOneClick">跑通一条回评链路</button>
-          </div>
-        </header>
+        </div>
+        <div id="advancedFilters" class="advanced-filters"></div>
+        <div id="activeFilters" class="active-filters"></div>
+      </section>
 
-        <section class="context-bar">
-          <label class="field inline">
-            <span>商家</span>
-            <select id="merchantSelect"></select>
-          </label>
-          <label class="field inline">
-            <span>广告素材</span>
-            <select id="materialSelect"></select>
-          </label>
-          <button class="primary-btn" id="applyContext">应用并同步画像</button>
-          <span id="merchantStatus" class="status muted">商家待选择</span>
-          <span id="profileStatus" class="status muted">画像未同步</span>
-        </section>
-
-        <section class="view active" id="overview">
-          <section class="service-banner">
+      <section class="content-grid">
+        <section class="result-panel">
+          <div class="panel-title">
             <div>
-              <span class="live-dot"></span>
-              <h2>不是查表工具，而是画像驱动的 AI 回评策略工作台</h2>
-              <p>用户画像决定“对谁说、风险多高”，商家画像决定“能说什么、不能说什么”，评论内容决定“这次具体问什么”。</p>
+              <h2>画像列表</h2>
+              <p id="resultCount">加载中</p>
             </div>
-          </section>
-
-          <div class="capability-grid">
-            <article class="cap-card">
-              <span>01 选择商家 / 素材</span>
-              <h3>确定回评场景</h3>
-              <p>以 merchant_id、material_id 拉起评论任务和画像上下文</p>
-            </article>
-            <article class="cap-card">
-              <span>02 评论 + 双画像</span>
-              <h3>user_id / merchant_id 命中</h3>
-              <p>按 p_date + ID in 查询，解析 result 与 merchant_profile</p>
-            </article>
-            <article class="cap-card">
-              <span>03 策略决策</span>
-              <h3>自动回 / 审核 / 转人工</h3>
-              <p>风险、意向、关注点、商家禁答边界共同决定</p>
-            </article>
-            <article class="cap-card">
-              <span>04 AI 回复</span>
-              <h3>策略转自然语言</h3>
-              <p>人工确认发布，Badcase 回流优化规则和提示词</p>
-            </article>
+            <select id="sortSelect">
+              <option value="default">默认排序</option>
+              <option value="merchant">商家优先</option>
+              <option value="user">用户优先</option>
+            </select>
           </div>
+          <div class="profile-list" id="profileList"></div>
+        </section>
 
-          <div class="overview-grid">
-            <article class="metric-card">
-              <span>待处理评论</span>
-              <strong id="metricNewComments">18,420</strong>
-              <em>+12.4%</em>
-            </article>
-            <article class="metric-card">
-              <span>风险评论</span>
-              <strong id="metricRiskComments">0</strong>
-              <em class="danger-text">需分流</em>
-            </article>
-            <article class="metric-card">
-              <span>画像命中率</span>
-              <strong id="metricHitRate">82.3%</strong>
-              <em>+6.2%</em>
-            </article>
-            <article class="metric-card">
-              <span>已发布数</span>
-              <strong id="metricPublishedTop">0</strong>
-              <em>可追溯</em>
-            </article>
+        <aside class="detail-panel">
+          <form class="query-box" id="queryForm">
+            <h3>画像查询</h3>
+            <label>
+              <span>查询对象</span>
+              <select id="queryRole">
+                <option value="2">普通用户</option>
+                <option value="1">商家</option>
+              </select>
+            </label>
+            <label>
+              <span>画像 ID</span>
+              <input id="queryId" value="1839980743" />
+            </label>
+            <button type="submit">查询画像</button>
+            <p id="queryStatus">当前使用已导入的离线画像数据。</p>
+          </form>
+
+          <div class="panel-title compact detail-title">
+            <div>
+              <h2>画像详情</h2>
+              <p id="detailSubtitle">选择左侧画像查看底表字段</p>
+            </div>
           </div>
+          <div id="profileDetail" class="profile-detail"></div>
+        </aside>
+      </section>
+    </main>
 
-          <div class="dashboard-grid">
-            <section class="panel">
-              <div class="panel-title">
-                <div>
-                  <h2>评论处理队列</h2>
-                  <p>从评论出发串联 user_id 用户画像、merchant_id 商家画像和发布决策</p>
-                </div>
-              </div>
-              <div class="pending-list" id="overviewPending"></div>
-            </section>
-
-            <section class="panel">
-              <div class="panel-title">
-                <div>
-                  <h2>核心链路</h2>
-                  <p>选择商家/素材 → 拉评论 → 查画像 → 解析画像 → 生成策略 → AI 回复 → 审核发布/Badcase</p>
-                </div>
-              </div>
-              <div class="decision-chain">
-                <span>选择商家 / 素材</span><i></i><span>拉取评论</span><i></i><span>查用户画像</span><i></i><span>查商家画像</span><i></i><span>生成回评策略</span><i></i><span>AI 回复审核</span>
-              </div>
-            </section>
-          </div>
-        </section>
-
-        <section class="view" id="profile">
-          <div class="two-col">
-            <section class="panel">
-              <div class="panel-title">
-                <h2>商家画像</h2>
-                <span class="mini-link">ks_mmu.pi_merchant_profile_generation_record</span>
-              </div>
-              <div id="merchantProfileBox" class="profile-box empty-box">尚未同步商家画像</div>
-            </section>
-            <section class="panel">
-              <div class="panel-title">
-                <h2>用户画像</h2>
-                <span class="mini-link">ks_mmu.llm_u2_user_description_white_box_td</span>
-              </div>
-              <div id="userProfileBox" class="profile-box empty-box">选择评论后展示用户画像</div>
-            </section>
-          </div>
-          <section class="panel">
-            <h2>两张底表只做画像来源，禁止扫全表</h2>
-            <div class="api-grid table-source-grid">
-              <code>用户画像表：ks_mmu.llm_u2_user_description_white_box_td
-select user_id, result
-from ks_mmu.llm_u2_user_description_white_box_td
-where p_date = '${date}' and user_id in (...)</code>
-              <code>商家画像表：ks_mmu.pi_merchant_profile_generation_record
-select merchant_id, first_industry_name, merchant_name, guide_words, chat_knowledge_aggr, merchant_profile
-from ks_mmu.pi_merchant_profile_generation_record
-where p_date = '${date}' and merchant_id in (...)</code>
-              <code>解析产物：用户意向阶段 / 关注点 / 意向强度 / 风险信号 / 商家优势 / 禁答边界 / 默认回复人设</code>
-            </div>
-          </section>
-        </section>
-
-        <section class="view" id="tasks">
-          <section class="panel">
-            <div class="panel-title">
-              <h2>评论任务</h2>
-              <div class="filters">
-                <select id="statusFilter">
-                  <option value="all">全部状态</option>
-                  <option value="待生成策略">待生成策略</option>
-                  <option value="待生成回复">待生成回复</option>
-                  <option value="待审核">待审核</option>
-                  <option value="已发布">已发布</option>
-                  <option value="风险拦截">风险拦截</option>
-                </select>
-                <input id="searchBox" type="search" placeholder="搜索评论/意图/画像" />
-              </div>
-            </div>
-            <div class="task-table-wrap">
-              <table class="task-table">
-                <thead>
-                  <tr>
-                    <th>评论</th>
-                    <th>user_id / merchant_id</th>
-                    <th>用户画像命中</th>
-                    <th>风险等级</th>
-                    <th>状态</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody id="taskRows"></tbody>
-              </table>
-            </div>
-          </section>
-        </section>
-
-        <section class="view" id="strategy">
-          <section class="panel">
-            <div class="panel-title">
-              <h2>回评策略</h2>
-              <span id="selectedTaskBadge" class="status muted">未选择评论</span>
-            </div>
-            <div class="flow-grid">
-              <article class="flow-card" id="merchantProfileCard"><span>商家画像</span><div class="empty">等待同步</div></article>
-              <article class="flow-card" id="userProfileCard"><span>用户画像</span><div class="empty">等待选择评论</div></article>
-              <article class="flow-card" id="strategyCard"><span>回评决策</span><div class="empty">等待生成策略</div></article>
-              <article class="flow-card" id="replyCard"><span>AI 回评</span><div class="empty">等待生成回复</div></article>
-            </div>
-            <div class="action-row">
-              <button class="ghost-btn" id="generateStrategy" disabled>生成回评策略</button>
-              <button class="ghost-btn" id="generateReply" disabled>生成 AI 回评</button>
-            </div>
-          </section>
-        </section>
-
-        <section class="view" id="review">
-          <section class="panel">
-            <div class="panel-title">
-              <h2>审核发布</h2>
-              <span class="mini-link">发布 / 转人工 / Badcase</span>
-            </div>
-            <div class="review-layout">
-              <div id="reviewPreview" class="review-preview empty-box">选择评论并生成回复后，在这里审核发布。</div>
-              <div class="review-actions">
-                <button class="primary-btn" id="publishReply" disabled>审核通过并发布</button>
-                <button class="danger-btn" id="markBadcase" disabled>标记 Badcase</button>
-              </div>
-              <section class="audit-log">
-                <h3>操作日志</h3>
-                <ol class="log-list" id="logList"></ol>
-              </section>
-            </div>
-          </section>
-        </section>
-      </main>
-    </div>
-
-    <div class="toast" id="toast"></div>
     <script src="./app.js"></script>
   </body>
 </html>

@@ -1,0 +1,56 @@
+{
+  "source_file": "synthetic_sample",
+  "record_count": 2,
+  "merchants": {
+    "2000000001": {
+      "merchant_id": "2000000001",
+      "p_date": "20260702",
+      "source_table": "ks_mmu.pi_merchant_profile_generation_record",
+      "first_industry_name": "教育培训",
+      "author_ks_id": "900000001",
+      "is_open_robot_valid": "是",
+      "merchant_name": "示例职业技能培训中心",
+      "corporation_name": "示例教育科技有限公司",
+      "user_name": "示例职业技能培训",
+      "user_text": "提供职业技能、课程咨询和就业指导服务。",
+      "guide_words": "欢迎咨询课程、学习周期和报名安排。",
+      "chat_knowledge_aggr": [],
+      "merchant_profile": {
+        "merchant_id": "2000000001",
+        "主营商品/服务": "课程培训、职业技能",
+        "经营业务范围": "课程咨询、预约咨询、线索留资",
+        "超出业务范围": "不承诺固定薪资，不公开直接报价",
+        "品牌荣誉": "示例培训机构",
+        "团队专家": "示例讲师团队",
+        "接待注意事项": "引导用户留下联系方式，由顾问进一步跟进",
+        "主动发问筛选项": "学习目标、可学习时间、意向课程",
+        "目标用户值": "学生、转行人群、职场人群"
+      }
+    },
+    "2000000002": {
+      "merchant_id": "2000000002",
+      "p_date": "20260702",
+      "source_table": "ks_mmu.pi_merchant_profile_generation_record",
+      "first_industry_name": "生活服务",
+      "author_ks_id": "900000002",
+      "is_open_robot_valid": "否",
+      "merchant_name": "示例本地生活门店",
+      "corporation_name": "示例本地生活服务有限公司",
+      "user_name": "示例到店服务",
+      "user_text": "提供本地到店、套餐介绍和预约咨询。",
+      "guide_words": "欢迎咨询门店信息、套餐内容和预约方式。",
+      "chat_knowledge_aggr": [],
+      "merchant_profile": {
+        "merchant_id": "2000000002",
+        "主营商品/服务": "本地到店、预约咨询",
+        "经营业务范围": "门店信息、套餐介绍、活动报名",
+        "超出业务范围": "不承诺未确认权益，不处理退款仲裁",
+        "品牌荣誉": "示例本地服务商",
+        "团队专家": "示例运营团队",
+        "接待注意事项": "先确认区域、时间和预算，再引导预约",
+        "主动发问筛选项": "所在区域、到店时间、人数、预算",
+        "目标用户值": "本地生活用户、价格敏感用户、高意向咨询用户"
+      }
+    }
+  }
+}

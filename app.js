@@ -1,588 +1,725 @@
-const state = {
-  currentStep: 1,
-  queryDate: "2026-06-30",
-  selectedMerchantId: "",
-  selectedMaterialId: "",
-  merchantProfile: null,
-  userProfiles: {},
-  selectedTaskId: null,
-  logs: [],
-  merchants: [
-    {
-      id: "m_auto_hz_001",
-      name: "杭州某某汽车门店",
-      industry: "汽车线索",
-      materials: [
-        { id: "mat_001", name: "618汽车线索短视频" },
-        { id: "mat_002", name: "本地门店直播切片" },
-      ],
-    },
-    {
-      id: "m_life_002",
-      name: "长沙轻医美体验店",
-      industry: "生活服务",
-      materials: [
-        { id: "mat_003", name: "暑期到店体验素材" },
-        { id: "mat_004", name: "直播预约福利素材" },
-      ],
-    },
-  ],
-  tasks: [],
-  badcases: [],
-};
-
-const mockApi = {
-  async getMerchantProfile(merchantId) {
-    await delay(360);
-    const merchant = state.merchants.find((item) => item.id === merchantId);
-    if (merchant.industry === "汽车线索") {
-      return {
-        merchantId,
-        name: merchant.name,
-        industry: "汽车线索",
-        goal: "到店试驾 / 私信留资",
-        advantages: ["本地门店", "现车可看", "近期优惠", "支持预约试驾"],
-        forbiddenClaims: ["不承诺固定价格", "不承诺贷款最低", "不编造库存"],
-        defaultPersona: "经验达人",
-        riskLevel: "中低",
-        sourceTable: "ks_mmu.pi_merchant_profile_generation_record",
-        queryKey: `p_date=${state.queryDate}, merchant_id in (${merchantId})`,
-        guideWords: ["欢迎咨询", "可引导私信", "可引导预约到店"],
-        chatKnowledge: ["现车和优惠随门店变化", "预约试驾需要确认到店时间"],
-      };
-    }
-    return {
-      merchantId,
-      name: merchant.name,
-      industry: "生活服务",
-      goal: "预约到店 / 私信咨询",
-      advantages: ["本地门店", "新人优惠", "可预约体验", "服务顾问跟进"],
-      forbiddenClaims: ["不承诺绝对效果", "不涉及医疗诊断", "不夸大功效"],
-      defaultPersona: "暖心客服",
-      riskLevel: "中",
-      sourceTable: "ks_mmu.pi_merchant_profile_generation_record",
-      queryKey: `p_date=${state.queryDate}, merchant_id in (${merchantId})`,
-      guideWords: ["先确认需求", "敏感问题转人工", "引导预约顾问"],
-      chatKnowledge: ["体验项目需根据个人情况确认", "不得承诺绝对效果"],
-    };
-  },
-
-  async getCommentTasks(materialId) {
-    await delay(320);
-    const auto = [
-      ["t_001", "这个多少钱啊？", "价格咨询", "u_001", "低"],
-      ["t_002", "可以预约试驾吗", "到店咨询", "u_002", "低"],
-      ["t_003", "有现车吗？", "库存咨询", "u_003", "低"],
-      ["t_004", "贷款利息能保证最低吗", "金融相关", "u_004", "高"],
-    ];
-    const life = [
-      ["t_101", "这个项目适合敏感肌吗？", "服务适配", "u_101", "中"],
-      ["t_102", "新人体验价是多少", "价格咨询", "u_102", "低"],
-      ["t_103", "能保证一次见效吗", "功效承诺", "u_103", "高"],
-      ["t_104", "周末可以预约吗", "预约咨询", "u_104", "低"],
-    ];
-    const source = materialId === "mat_003" || materialId === "mat_004" ? life : auto;
-    return source.map(([id, comment, intent, userId, risk]) => ({
-      id,
-      comment,
-      intent,
-      userId,
-      risk,
-      userProfile: null,
-      strategy: null,
-      aiReply: "",
-      status: risk === "高" ? "风险拦截" : "待生成策略",
-    }));
-  },
-
-  async getUserProfiles(userIds) {
-    await delay(420);
-    const profiles = {};
-    userIds.forEach((userId, index) => {
-      const base = [
-        {
-          stage: "比价阶段",
-          intentLevel: "高意向",
-          priceSensitivity: "高",
-          location: "杭州",
-          focus: ["价格", "优惠", "预算"],
-          tone: "直接、克制、给入口",
-        },
-        {
-          stage: "到店决策",
-          intentLevel: "强意向",
-          priceSensitivity: "中",
-          location: "本地",
-          focus: ["预约", "门店", "时间"],
-          tone: "明确、服务型、给下一步",
-        },
-        {
-          stage: "购买前确认",
-          intentLevel: "高意向",
-          priceSensitivity: "中",
-          location: "杭州",
-          focus: ["库存", "到店", "提车"],
-          tone: "不编造事实，提示确认",
-        },
-        {
-          stage: "风险咨询",
-          intentLevel: "中意向",
-          priceSensitivity: "高",
-          location: "未知",
-          focus: ["金融", "承诺", "风险"],
-          tone: "合规、转人工",
-        },
-      ][index % 4];
-      profiles[userId] = {
-        userId,
-        sourceTable: "ks_mmu.llm_u2_user_description_white_box_td",
-        queryKey: `p_date=${state.queryDate}, user_id in (...)`,
-        profileHit: true,
-        riskSignal: base.stage === "风险咨询" ? "承诺/金融/效果类敏感问题" : "无明显风险",
-        ...base,
-      };
-    });
-    return profiles;
-  },
-
-  async generateStrategy({ task, merchantProfile, userProfile }) {
-    await delay(360);
-    if (task.risk === "高") {
-      return {
-        mode: "转人工",
-        persona: "-",
-        guidance: "高风险问题不自动公开回复，进入人工处理",
-        reason: `用户画像风险信号：${userProfile.riskSignal}；评论命中 ${task.intent}；商家禁答边界：${merchantProfile.forbiddenClaims.join(" / ")}`,
-        publishable: false,
-      };
-    }
-    const guidance = task.intent.includes("预约")
-      ? "突出本地门店和预约入口，引导详情页/私信"
-      : task.intent.includes("价格")
-        ? "不报固定价格，强调优惠边界，引导详情页/私信"
-        : "基于商家优势回答，不编造事实，必要时引导私信确认";
-    return {
-      mode: task.risk === "中" ? "审核" : "自动回",
-      persona: merchantProfile.defaultPersona,
-      guidance,
-      reason: `用户处于${userProfile.stage}，关注${userProfile.focus.join("、")}，意向强度 ${userProfile.intentLevel}；商家可提供 ${merchantProfile.advantages.join("、")}；禁答 ${merchantProfile.forbiddenClaims.join("、")}`,
-      publishable: true,
-    };
-  },
-
-  async generateReply({ task, merchantProfile, userProfile, strategy }) {
-    await delay(420);
-    if (!strategy.publishable) return "该评论命中高风险规则，建议转人工处理，不生成公开 AI 回复。";
-    if (task.intent.includes("价格")) {
-      return `这项近期有活动，具体价格会和配置/服务方案有关，可以点详情页先看优惠，也可以私信确认你关注的版本。`;
-    }
-    if (task.intent.includes("预约") || task.intent.includes("到店")) {
-      return `可以预约，我们是本地门店，建议点详情页选择时间，也可以私信确认最近的到店安排。`;
-    }
-    if (task.intent.includes("库存")) {
-      return `现车情况会随门店到车变化，建议点详情页或私信确认你想看的配置，我们可以帮你查最近安排。`;
-    }
-    return `这个问题建议结合你的情况确认，我们可以根据${userProfile.focus[0]}帮你进一步看下，点击详情页或私信都可以。`;
-  },
-};
-
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-const pageMeta = {
-  overview: ["AI 回评策略工作台", "底层画像表只提供上下文，平台负责把画像解析成回评策略和发布决策。"],
-  profile: ["画像联动", "明确两张底表如何参与回评决策：按 p_date + ID in 查询，解析画像字段，禁止扫全表。"],
-  tasks: ["评论任务", "展示评论、user_id、merchant_id、用户画像命中情况、风险等级和处理状态。"],
-  strategy: ["回评策略", "用户画像决定对谁说和风险多高，商家画像决定能说什么和不能说什么。"],
-  review: ["审核发布", "看 AI 生成内容，人工确认发布、转人工或标记 Badcase。"],
+const state = {
+  profiles: [],
+  meta: {},
+  keyword: "",
+  role: "all",
+  industry: "all",
+  facets: {},
+  sort: "default",
+  selectedId: "",
 };
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, Math.min(ms, 140)));
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
-function setText(selector, text) {
-  const el = $(selector);
-  if (el) el.textContent = text;
+function flattenText(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
 }
 
-function switchView(view) {
-  if (!pageMeta[view]) return;
-  $$(".side-nav button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === view);
+function cleanSummary(value) {
+  return String(value || "")
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/\n+/g, " ")
+    .replace(/\|\|/g, " / ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function shortText(value, limit = 18) {
+  const text = String(value || "").trim();
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+}
+
+function serviceContext() {
+  return {
+    biz_code: "business_platform",
+    session_id: "",
+    user_id: "0",
+    account_id: "0",
+    merchant_id: "0",
+    username: "",
+    request_id: "",
+    agent_name: "",
+    scene_id: 0,
+    scene_type: 0,
+    scene_name: "",
+    token: "",
+    ability_name: "",
+    invoker: "",
+  };
+}
+
+function roleLabel(role) {
+  return Number(role) === 1 ? "商家画像" : "用户画像";
+}
+
+function currentModeLabel() {
+  if (state.role === "2") return "用户画像";
+  if (state.role === "1") return "商家画像";
+  return "全部画像";
+}
+
+const userFacetGroups = [
+  {
+    title: "基础属性",
+    items: [
+      ["gender", "性别"],
+      ["age", "年龄段"],
+      ["city", "常驻地域"],
+      ["marriage", "婚姻状态"],
+      ["parenting", "育儿状态"],
+    ],
+  },
+  {
+    title: "设备消费",
+    items: [
+      ["device", "使用设备"],
+      ["consume", "消费水平"],
+      ["price", "价格敏感"],
+    ],
+  },
+  {
+    title: "内容兴趣",
+    items: [
+      ["interest", "核心兴趣"],
+      ["secondaryInterest", "次级兴趣"],
+      ["adPreference", "广告偏好"],
+    ],
+  },
+];
+
+const merchantFacetGroups = [
+  {
+    title: "商家属性",
+    items: [
+      ["merchantIndustry", "一级行业"],
+      ["robot", "智能客服"],
+      ["service", "主营服务"],
+    ],
+  },
+  {
+    title: "经营信息",
+    items: [
+      ["businessScope", "业务范围"],
+      ["targetUser", "目标客群"],
+    ],
+  },
+];
+
+const facetOptionCatalog = {
+  gender: ["男", "女", "未知"],
+  age: ["18岁以下", "18-23岁", "24-30岁", "31-40岁", "41-50岁", "50岁以上", "未知"],
+  city: ["一线城市", "新一线城市", "二线城市", "三线及以下", "县城/乡镇", "海外", "未知"],
+  marriage: ["未婚", "已婚", "离异", "未知"],
+  parenting: ["未育", "已育", "孕产期", "未知"],
+  device: ["iPhone", "华为", "小米/红米", "OPPO", "vivo", "荣耀", "三星", "其他安卓", "未知"],
+  consume: ["极低消费", "低消费", "中低消费", "中等消费", "中高消费", "高消费", "未知"],
+  price: ["高", "中", "低", "未知"],
+  interest: ["美食", "校园生活", "社会百态", "明星娱乐", "旅游", "穿搭", "生活服务", "学习成长", "时政资讯", "军事", "历史", "数码", "汽车", "母婴", "游戏", "运动健身"],
+  secondaryInterest: ["旅游风光", "穿搭", "生活服务", "学习成长", "娱乐八卦", "本地资讯", "探店", "科普内容", "情感", "职场"],
+  adPreference: ["短剧化", "场景化", "真实体验", "福利明确", "价格促销", "品牌种草", "本地到店", "直播引导", "测评对比"],
+  merchantIndustry: ["教育培训", "生活服务", "餐饮美食", "汽车服务", "医疗健康", "美容美体", "电商零售", "家居家装", "旅游出行", "金融服务", "招商加盟", "企业服务", "数码家电", "房产家居", "本地服务", "其他"],
+  robot: ["已开通", "未开通"],
+  service: ["课程培训", "职业技能", "商品销售", "本地到店", "到家服务", "线索收集", "预约咨询"],
+  businessScope: ["课程咨询", "门店信息", "预约咨询", "商品介绍", "售前售后", "活动报名", "线索留资"],
+  targetUser: ["学生", "家长", "职场人群", "转行人群", "本地生活用户", "价格敏感用户", "高意向咨询用户"],
+};
+
+function roleAvatar(role) {
+  return Number(role) === 1 ? "商" : "用";
+}
+
+function metricLabel(key) {
+  const labels = {
+    author_ks_id: "作者ID",
+    source_table: "来源表",
+    p_date: "数据日期",
+    user_id: "用户ID",
+    merchant_id: "商家ID",
+    first_industry_name: "一级行业",
+    is_open_robot_valid: "智能客服",
+    merchant_name: "商家名称",
+    corporation_name: "营业主体",
+    user_name: "账号名称",
+    user_text: "账号简介",
+    guide_words: "欢迎语",
+    result: "用户画像全文",
+    merchant_profile: "商家画像",
+    "画像字段": "画像字段",
+    "板块": "画像板块",
+    "设备": "使用设备",
+    "价格敏感": "价格敏感",
+    "智能客服": "智能客服",
+  };
+  return labels[key] || key;
+}
+
+function normalizeRobotStatus(value) {
+  if (value === "1" || value === 1 || value === true) return "已开通";
+  if (value === "0" || value === 0 || value === false) return "未开通";
+  return value || "-";
+}
+
+function sourceLabel(source) {
+  if (source === "offline") return "离线数据";
+  if (source === "proxy") return "实时接口";
+  return source || "本地数据";
+}
+
+function userProfileBlock(profile, block) {
+  return profile.record?.user_profile?.[block] || {};
+}
+
+function merchantProfileBlock(profile) {
+  return profile.record?.merchant_profile || {};
+}
+
+function facetValue(profile, key) {
+  const base = userProfileBlock(profile, "基础画像");
+  const interest = userProfileBlock(profile, "视频兴趣与内容偏好");
+  const commerce = userProfileBlock(profile, "电商与广告行为特征");
+  const merchant = merchantProfileBlock(profile);
+  const map = {
+    gender: base["推测性别"],
+    age: base["年龄段"],
+    city: base["居住城市"],
+    marriage: base["婚姻状况"],
+    parenting: base["育儿状况"],
+    device: base["使用设备"],
+    consume: base["消费水平标签"],
+    price: commerce["价格敏感度"],
+    interest: interest["核心兴趣垂类"],
+    secondaryInterest: interest["次级兴趣"],
+    adPreference: commerce["广告形式偏好"],
+    merchantIndustry: profile.record?.first_industry_name,
+    robot: normalizeRobotStatus(profile.record?.is_open_robot_valid),
+    service: merchant["主营商品/服务"],
+    businessScope: merchant["经营业务范围"],
+    targetUser: merchant["目标用户值"],
+  };
+  return String(map[key] || "").trim();
+}
+
+function facetOptions(key) {
+  const sourceRole = key.startsWith("merchant") || ["robot", "service", "businessScope", "targetUser"].includes(key) ? 1 : 2;
+  if (["city", "merchantIndustry", "service", "businessScope", "targetUser"].includes(key)) return facetOptionCatalog[key];
+  const dataOptions = state.profiles
+    .filter((profile) => Number(profile.role) === sourceRole)
+    .map((profile) => facetValue(profile, key))
+    .filter(Boolean);
+  return [...new Set([...(facetOptionCatalog[key] || []), ...dataOptions])]
+    .slice(0, 60);
+}
+
+function profileMatchesFacets(profile) {
+  return Object.entries(state.facets).every(([key, value]) => {
+    if (!value || value === "all") return true;
+    const current = facetValue(profile, key);
+    if (value === "未知") return !current || current.includes("未知");
+    if (!current) return false;
+    if (current.includes(value)) return true;
+    if (value === "一线城市") return /北京|上海|广州|深圳/.test(current);
+    if (value === "新一线城市") return /成都|杭州|重庆|武汉|苏州|西安|南京|长沙|天津|郑州|东莞|青岛|昆明|宁波|合肥/.test(current);
+    if (value === "二线城市") return /二线/.test(current);
+    if (value === "三线及以下") return /三线|四线|五线|下沉/.test(current);
+    if (value === "县城\/乡镇") return /县|乡|镇|农村/.test(current);
+    if (value === "海外") return /海外|国外|美国|日本|韩国|新加坡|欧洲/.test(current);
+    if (value === "教育培训") return /教育|培训|学校|课程|学习/.test(current);
+    if (value === "餐饮美食") return /餐饮|美食|餐厅|小吃|烹饪|中餐|西点|西餐/.test(current);
+    if (value === "汽车服务") return /汽车|车|试驾|4S|汽修/.test(current);
+    if (value === "美容美体") return /美妆|美容|美体|丽人|个护|美甲|医美/.test(current);
+    if (value === "数码家电") return /3C|数码|家电|电器|手机|电脑/.test(current);
+    if (value === "企业服务") return /企业|平台|软件|SaaS|网络服务/.test(current);
+    if (value === "本地服务") return /本地|到店|门店|生活服务/.test(current);
+    if (value === "课程培训") return /课程|培训|学习|专业/.test(current);
+    if (value === "职业技能") return /职业|技能|就业|技工|烹饪|护理/.test(current);
+    if (value === "本地到店") return /到店|门店|套餐|预约/.test(current);
+    if (value === "线索收集") return /留资|联系方式|电话|私信|预约/.test(current);
+    if (value === "技能学习人群") return /学习|技能|专业|学生|转行/.test(current);
+    if (value === "小米/红米") return current.includes("小米") || current.includes("红米");
+    if (value === "其他安卓") return /OPPO|vivo|荣耀|三星|安卓/.test(current);
+    if (value === "低消费") return current.includes("低消费") || current.includes("极低消费");
+    if (value === "中低消费") return current.includes("中低");
+    if (value === "高消费") return current.includes("高消费");
+    return false;
   });
-  $$(".view").forEach((section) => {
-    section.classList.toggle("active", section.id === view);
+}
+
+function getRecordTitle(record) {
+  if (Number(record.role) === 1) return record.title || record.record?.merchant_name || `商家 ${record.id}`;
+  return record.title || `用户 ${record.id}`;
+}
+
+function getSearchText(profile) {
+  const record = { ...(profile.record || {}) };
+  delete record.chat_knowledge_aggr;
+  return [
+    profile.id,
+    profile.title,
+    profile.subtitle,
+    profile.summary,
+    profile.source_table,
+    ...(profile.tags || []),
+    flattenText(record),
+  ].join(" ").toLowerCase();
+}
+
+function filteredProfiles() {
+  const keyword = state.keyword.trim().toLowerCase();
+  let rows = state.profiles.filter((profile) => {
+    const roleMatched = state.role === "all" || String(profile.role) === state.role;
+    const industryMatched = state.industry === "all" || profile.subtitle === state.industry || (profile.tags || []).includes(state.industry);
+    const keywordMatched = !keyword || getSearchText(profile).includes(keyword);
+    const facetsMatched = profileMatchesFacets(profile);
+    return roleMatched && industryMatched && keywordMatched && facetsMatched;
   });
-  $(".main").dataset.view = view;
-  setText("#pageTitle", pageMeta[view][0]);
-  setText("#pageDesc", pageMeta[view][1]);
+
+  if (state.sort === "merchant") rows = rows.sort((a, b) => Number(a.role) - Number(b.role));
+  if (state.sort === "user") rows = rows.sort((a, b) => Number(b.role) - Number(a.role));
+  return rows;
 }
 
-function toast(message) {
-  const el = $("#toast");
-  el.textContent = message;
-  el.classList.add("show");
-  setTimeout(() => el.classList.remove("show"), 1800);
-}
-
-function log(message) {
-  state.logs.unshift(`${new Date().toLocaleTimeString("zh-CN", { hour12: false })} ${message}`);
-  renderLogs();
-}
-
-function setStep(step) {
-  state.currentStep = Math.max(state.currentStep, step);
-  $$(".step").forEach((el) => {
-    const n = Number(el.dataset.step);
-    el.classList.toggle("active", n <= state.currentStep);
-  });
-}
-
-function statusClass(status) {
-  if (status === "已发布") return "success";
-  if (status === "待审核" || status === "待生成回复" || status === "待生成策略") return "warn";
-  if (status === "风险拦截") return "danger";
-  return "muted";
-}
-
-function initSelectors() {
-  $("#merchantSelect").innerHTML = state.merchants.map((m) => `<option value="${m.id}">${m.name}</option>`).join("");
-  renderMaterialOptions();
-}
-
-function renderMaterialOptions() {
-  const merchantId = $("#merchantSelect").value || state.merchants[0].id;
-  const merchant = state.merchants.find((m) => m.id === merchantId);
-  $("#materialSelect").innerHTML = merchant.materials.map((m) => `<option value="${m.id}">${m.name}</option>`).join("");
-}
-
-async function confirmMerchant() {
-  state.selectedMerchantId = $("#merchantSelect").value;
-  state.selectedMaterialId = $("#materialSelect").value;
-  state.merchantProfile = null;
-  state.userProfiles = {};
-  state.selectedTaskId = null;
-  state.tasks = await mockApi.getCommentTasks(state.selectedMaterialId);
-  $("#merchantStatus").textContent = "已选择";
-  $("#merchantStatus").className = "status success";
-  renderSideMerchant();
-  setStep(2);
-  log("已选择商家与素材，并拉取评论任务");
-  renderAll();
-}
-
-async function syncProfiles() {
-  if (!state.selectedMerchantId) return toast("请先选择商家/素材");
-  const applyButton = $("#applyContext");
-  if (applyButton) {
-    applyButton.disabled = true;
-    applyButton.textContent = "同步中...";
+function renderIndustryChips() {
+  const label = $("#tagFilterLabel");
+  if (label) label.textContent = state.role === "2" ? "用户标签" : state.role === "1" ? "商家行业" : "行业/标签";
+  const hint = $("#filterModeHint");
+  if (hint) {
+    hint.textContent = state.role === "2"
+      ? "当前展示用户画像筛选：基础属性、设备消费、内容兴趣。"
+      : state.role === "1"
+        ? "当前展示商家画像筛选：商家属性、经营信息。"
+        : "可先选择用户画像或商家画像，再展开对应结构化筛选。";
   }
-  const merchantProfile = await mockApi.getMerchantProfile(state.selectedMerchantId);
-  const userProfiles = await mockApi.getUserProfiles(state.tasks.map((t) => t.userId));
-  state.merchantProfile = merchantProfile;
-  state.userProfiles = userProfiles;
-  state.tasks = state.tasks.map((task) => ({ ...task, userProfile: userProfiles[task.userId] }));
-  if (applyButton) {
-    applyButton.textContent = "应用并同步画像";
-    applyButton.disabled = false;
-  }
-  $("#profileStatus").textContent = "已同步";
-  $("#profileStatus").className = "status success";
-  setStep(3);
-  log("已同步商家画像和评论用户画像");
-  renderAll();
-}
 
-async function applyContext() {
-  await confirmMerchant();
-  await syncProfiles();
-  toast("商家画像与用户画像已同步");
-}
+  const values = state.role === "2"
+    ? state.profiles
+      .filter((item) => Number(item.role) === 2)
+      .flatMap((item) => item.tags || [])
+    : state.role === "1"
+      ? facetOptionCatalog.merchantIndustry
+    : state.profiles
+      .filter((item) => Number(item.role) === 1)
+      .map((item) => item.subtitle);
 
-function selectTask(taskId) {
-  state.selectedTaskId = taskId;
-  setStep(4);
-  const task = getSelectedTask();
-  if (!task) return toast("请先确认商家/素材并同步任务");
-  log(`已选择评论：${task.comment}`);
-  renderAll();
-  switchView("strategy");
-}
+  const industries = [...new Set(values.filter(Boolean))]
+    .slice(0, 10);
 
-function getSelectedTask() {
-  return state.tasks.find((task) => task.id === state.selectedTaskId);
-}
-
-async function generateStrategy() {
-  const task = getSelectedTask();
-  if (!task) return toast("请先选择评论");
-  if (!state.merchantProfile || !task.userProfile) return toast("请先同步画像");
-  task.strategy = await mockApi.generateStrategy({
-    task,
-    merchantProfile: state.merchantProfile,
-    userProfile: task.userProfile,
-  });
-  task.status = task.strategy.publishable ? "待生成回复" : "风险拦截";
-  setStep(5);
-  log(`已生成策略：${task.strategy.mode}`);
-  renderAll();
-}
-
-async function generateReply() {
-  const task = getSelectedTask();
-  if (!task?.strategy) return toast("请先生成策略");
-  task.aiReply = await mockApi.generateReply({
-    task,
-    merchantProfile: state.merchantProfile,
-    userProfile: task.userProfile,
-    strategy: task.strategy,
-  });
-  task.status = task.strategy.publishable ? "待审核" : "风险拦截";
-  setStep(6);
-  log("已生成 AI 回评");
-  renderAll();
-}
-
-function publishReply() {
-  const task = getSelectedTask();
-  if (!task?.aiReply || task.status !== "待审核") return toast("当前任务不可发布");
-  task.status = "已发布";
-  log("已审核通过并发布回复");
-  renderAll();
-  toast("发布成功");
-}
-
-function markBadcase() {
-  const task = getSelectedTask();
-  if (!task) return;
-  state.badcases.unshift({
-    id: `bad_${Date.now()}`,
-    comment: task.comment,
-    reason: task.risk === "高" ? "高风险评论不适合公开 AI 回复" : "人工反馈回复不合适",
-  });
-  task.status = "风险拦截";
-  log("已标记 Badcase");
-  renderAll();
-}
-
-async function runOneClick() {
-  const btn = $("#runOneClick");
-  btn.disabled = true;
-  btn.textContent = "链路执行中...";
-  try {
-    await confirmMerchant();
-    await syncProfiles();
-    const first = state.tasks.find((task) => task.risk !== "高");
-    selectTask(first.id);
-    await generateStrategy();
-    await generateReply();
-    switchView("review");
-    toast("已跑通到待审核状态");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "跑通一条回评链路";
-  }
-}
-
-function renderTasks() {
-  const status = $("#statusFilter").value;
-  const keyword = $("#searchBox").value.trim();
-  const rows = state.tasks.filter((task) => {
-    const matchedStatus = status === "all" || task.status === status;
-    const haystack = `${task.comment}${task.intent}${task.userProfile?.intentLevel || ""}${task.userProfile?.focus?.join("") || ""}`;
-    return matchedStatus && (!keyword || haystack.includes(keyword));
-  });
-  $("#taskRows").innerHTML = rows.map((task) => `
-    <tr class="${task.id === state.selectedTaskId ? "selected" : ""}">
-      <td>${task.comment}</td>
-      <td><b>${task.userId}</b><br><span class="subtle">${state.selectedMerchantId || "未选择商家"}</span></td>
-      <td>${task.userProfile ? `命中 · ${task.userProfile.intentLevel}<br><span class="subtle">${task.userProfile.focus.join("、")}</span>` : "未同步"}</td>
-      <td><span class="status ${task.risk === "高" ? "danger" : "success"}">${task.risk}</span></td>
-      <td><span class="status ${statusClass(task.status)}">${task.status}</span></td>
-      <td><button class="link-btn" data-task="${task.id}">选择</button></td>
-    </tr>
-  `).join("") || `<tr><td colspan="6">暂无评论任务</td></tr>`;
-}
-
-function renderProfiles() {
-  const merchantBox = $("#merchantProfileBox");
-  if (!state.merchantProfile) {
-    merchantBox.className = "profile-box empty-box";
-    merchantBox.textContent = "尚未同步商家画像";
-  } else {
-    merchantBox.className = "profile-box";
-    merchantBox.innerHTML = `
-      <h3>${state.merchantProfile.name}</h3>
-      <dl class="profile-dl">
-        <dt>来源表</dt><dd>${state.merchantProfile.sourceTable}</dd>
-        <dt>查询约束</dt><dd>${state.merchantProfile.queryKey}</dd>
-        <dt>行业</dt><dd>${state.merchantProfile.industry}</dd>
-        <dt>目标</dt><dd>${state.merchantProfile.goal}</dd>
-        <dt>风险</dt><dd>${state.merchantProfile.riskLevel}</dd>
-        <dt>人设</dt><dd>${state.merchantProfile.defaultPersona}</dd>
-      </dl>
-      <div class="profile-tags">${state.merchantProfile.advantages.map((item) => `<span>${item}</span>`).join("")}</div>
-      <p class="profile-note"><b>禁答边界：</b>${state.merchantProfile.forbiddenClaims.join("、")}</p>
-      <p class="profile-note"><b>知识补充：</b>${state.merchantProfile.guideWords.join("、")}；${state.merchantProfile.chatKnowledge.join("、")}</p>
-    `;
-  }
-
-  const task = getSelectedTask();
-  const userBox = $("#userProfileBox");
-  if (!task?.userProfile) {
-    userBox.className = "profile-box empty-box";
-    userBox.textContent = task ? "该评论用户画像尚未同步" : "选择评论后展示用户画像";
-  } else {
-    userBox.className = "profile-box";
-    userBox.innerHTML = `
-      <h3>${task.userProfile.intentLevel} · ${task.userProfile.stage}</h3>
-      <dl class="profile-dl">
-        <dt>来源表</dt><dd>${task.userProfile.sourceTable}</dd>
-        <dt>查询约束</dt><dd>${task.userProfile.queryKey}</dd>
-        <dt>位置</dt><dd>${task.userProfile.location}</dd>
-        <dt>价格敏感</dt><dd>${task.userProfile.priceSensitivity}</dd>
-        <dt>表达</dt><dd>${task.userProfile.tone}</dd>
-      </dl>
-      <div class="profile-tags">${task.userProfile.focus.map((item) => `<span>${item}</span>`).join("")}</div>
-      <p class="profile-note"><b>风险信号：</b>${task.userProfile.riskSignal}</p>
-    `;
-  }
-}
-
-function renderFlow() {
-  const task = getSelectedTask();
-  $("#selectedTaskBadge").textContent = task ? task.comment : "未选择评论";
-  $("#selectedTaskBadge").className = task ? "status success" : "status muted";
-
-  $("#merchantProfileCard").innerHTML = state.merchantProfile ? `
-    <span>商家画像</span>
-    <h3>${state.merchantProfile.industry}</h3>
-    <p>${state.merchantProfile.goal}</p>
-    <ul>${state.merchantProfile.advantages.map((item) => `<li>${item}</li>`).join("")}</ul>
-  ` : `<span>商家画像</span><div class="empty">等待同步</div>`;
-
-  $("#userProfileCard").innerHTML = task?.userProfile ? `
-    <span>用户画像</span>
-    <h3>${task.userProfile.intentLevel} · ${task.userProfile.stage}</h3>
-    <p>关注：${task.userProfile.focus.join("、")}</p>
-    <p>表达：${task.userProfile.tone}</p>
-  ` : `<span>用户画像</span><div class="empty">等待选择评论</div>`;
-
-  $("#strategyCard").innerHTML = task?.strategy ? `
-    <span>回评决策</span>
-    <h3>${task.strategy.mode}</h3>
-    <p>${task.strategy.guidance}</p>
-    <p>${task.strategy.reason}</p>
-  ` : `<span>策略生成</span><div class="empty">等待生成策略</div>`;
-
-  $("#replyCard").innerHTML = task?.aiReply ? `
-    <span>AI 回评</span>
-    <h3>${task.strategy?.persona || "AI客服"}</h3>
-    <p>${task.aiReply}</p>
-  ` : `<span>AI 回评</span><div class="empty">等待生成回复</div>`;
-
-  $("#generateStrategy").disabled = !task || !state.merchantProfile || !task.userProfile;
-  $("#generateReply").disabled = !task?.strategy || !task.strategy.publishable;
-  $("#publishReply").disabled = !task?.aiReply || task.status !== "待审核";
-  $("#markBadcase").disabled = !task;
-}
-
-function renderSummary() {
-  const profileHit = state.tasks.filter((task) => task.userProfile).length;
-  const published = state.tasks.filter((task) => task.status === "已发布").length;
-  const todo = state.tasks.filter((task) => !["已发布", "风险拦截"].includes(task.status)).length;
-  setText("#metricPublishedTop", published);
-  setText("#metricNewComments", (18420 + state.tasks.length).toLocaleString("zh-CN"));
-  const riskComments = state.tasks.filter((task) => task.risk === "高" || task.status === "风险拦截").length;
-  setText("#metricRiskComments", riskComments);
-  setText("#metricHitRate", state.tasks.length ? `${Math.round((profileHit / state.tasks.length) * 100)}%` : "82.3%");
-
-}
-
-function renderSideMerchant() {
-  const merchantId = state.selectedMerchantId || $("#merchantSelect")?.value || state.merchants[0].id;
-  const merchant = state.merchants.find((item) => item.id === merchantId);
-  if (!merchant) return;
-  setText("#sideMerchantName", merchant.name);
-  setText("#sideMerchantMeta", `${merchant.industry} · 灰度商家`);
-}
-
-function renderOverviewPending() {
-  const box = $("#overviewPending");
-  if (!box) return;
-  const rows = state.tasks.length ? state.tasks : [
-    { id: "demo_1", comment: "可以预约试驾吗", intent: "到店咨询", risk: "低", status: "待生成策略", userProfile: { intentLevel: "强到店意向", focus: ["预约", "门店"] } },
-    { id: "demo_2", comment: "这是骗人的吗", intent: "负向质疑", risk: "高", status: "风险拦截", userProfile: { intentLevel: "负向质疑", focus: ["风险", "承诺"] } },
-    { id: "demo_3", comment: "有现车吗", intent: "库存咨询", risk: "低", status: "待生成策略", userProfile: { intentLevel: "高意向", focus: ["库存", "到店"] } },
-    { id: "demo_4", comment: "贷款利息能保证最低吗", intent: "金融相关", risk: "高", status: "风险拦截", userProfile: { intentLevel: "金融敏感", focus: ["承诺", "风险"] } },
-  ];
-  box.innerHTML = rows.slice(0, 4).map((task) => `
-    <article class="pending-item">
-      <div>
-        <b>${task.comment}</b>
-        <span>${task.userProfile?.intentLevel || "画像未同步"} / ${task.userProfile?.focus?.join("、") || task.intent} / 风险${task.risk} / ${task.status}</span>
-      </div>
-    </article>
+  $("#industryChips").innerHTML = industries.map((industry) => `
+    <button class="chip" title="${escapeHtml(industry)}" data-industry="${escapeHtml(industry)}">${escapeHtml(shortText(industry, 22))}</button>
   `).join("");
 }
 
-function renderReviewPreview() {
-  const box = $("#reviewPreview");
-  if (!box) return;
-  const task = getSelectedTask();
-  if (!task) {
-    box.className = "review-preview empty-box";
-    box.textContent = "选择评论并生成回复后，在这里审核发布。";
+function renderAdvancedFilters() {
+  const panel = $("#advancedFilters");
+  if (!panel) return;
+  const groups = state.role === "2"
+    ? userFacetGroups
+    : state.role === "1"
+      ? merchantFacetGroups
+      : [];
+
+  if (!groups.length) {
+    panel.innerHTML = "";
+    panel.classList.remove("visible");
     return;
   }
-  box.className = "review-preview";
-  box.innerHTML = `
-    <h3>${task.comment}</h3>
-    <p><b>意图：</b>${task.intent}　<b>风险：</b>${task.risk}　<b>状态：</b>${task.status}</p>
-    <p><b>策略：</b>${task.strategy ? `${task.strategy.mode}，${task.strategy.guidance}` : "尚未生成策略"}</p>
-    <p><b>AI 回评：</b>${task.aiReply || "尚未生成回复"}</p>
+
+  panel.classList.add("visible");
+  panel.innerHTML = groups.map((group) => `
+    <div class="facet-row">
+      <span>${escapeHtml(group.title)}</span>
+      <div class="facet-controls">
+        ${group.items.map(([key, label]) => {
+          const options = facetOptions(key);
+          const widthClass = ["city", "interest", "secondaryInterest", "adPreference", "service", "businessScope", "targetUser"].includes(key)
+            ? "wide"
+            : "compact";
+          return `
+            <label class="facet-select ${widthClass}" title="${escapeHtml(label)}">
+              <select data-facet="${escapeHtml(key)}" ${options.length ? "" : "disabled"}>
+                <option value="all">${escapeHtml(label)}</option>
+                ${options.map((option) => `
+                  <option value="${escapeHtml(option)}" ${state.facets[key] === option ? "selected" : ""}>${escapeHtml(option)}</option>
+                `).join("")}
+              </select>
+            </label>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderActiveFilters() {
+  const panel = $("#activeFilters");
+  if (!panel) return;
+  const items = [];
+  if (state.role !== "all") items.push(["画像类型", currentModeLabel()]);
+  if (state.industry !== "all") items.push([state.role === "2" ? "用户标签" : "商家行业", state.industry]);
+  Object.entries(state.facets).forEach(([key, value]) => {
+    if (!value || value === "all") return;
+    const allGroups = [...userFacetGroups, ...merchantFacetGroups];
+    const label = allGroups.flatMap((group) => group.items).find(([itemKey]) => itemKey === key)?.[1] || key;
+    items.push([label, value]);
+  });
+
+  if (!items.length) {
+    panel.innerHTML = `<span>当前未设置额外筛选</span>`;
+    return;
+  }
+
+  panel.innerHTML = `
+    <span>已选</span>
+    ${items.map(([label, value]) => `
+      <em title="${escapeHtml(value)}">${escapeHtml(label)}：${escapeHtml(shortText(value, 18))}</em>
+    `).join("")}
   `;
 }
 
-function renderLogs() {
-  $("#logList").innerHTML = state.logs.map((item) => `<li>${item}</li>`).join("") || `<li>暂无操作日志</li>`;
+function refreshFilters() {
+  renderIndustryChips();
+  renderAdvancedFilters();
+  renderActiveFilters();
 }
 
-function renderAll() {
-  renderTasks();
+function resetFilters() {
+  state.role = "all";
+  state.industry = "all";
+  state.facets = {};
+  state.keyword = "";
+  $("#keywordInput").value = "";
+  $$("[data-role]").forEach((item) => item.classList.toggle("active", item.dataset.role === "all"));
+  $$("[data-industry]").forEach((item) => item.classList.toggle("active", item.dataset.industry === "all"));
+  $$(".side-item").forEach((item) => item.classList.toggle("active", item.dataset.section === "market"));
+  refreshFilters();
+  selectFirstVisible();
   renderProfiles();
-  renderFlow();
-  renderReviewPreview();
-  renderOverviewPending();
-  renderSideMerchant();
-  renderSummary();
-  renderLogs();
 }
 
-$("#merchantSelect").addEventListener("change", renderMaterialOptions);
-$("#applyContext").addEventListener("click", applyContext);
-$("#runOneClick").addEventListener("click", runOneClick);
-$("#generateStrategy").addEventListener("click", generateStrategy);
-$("#generateReply").addEventListener("click", generateReply);
-$("#publishReply").addEventListener("click", publishReply);
-$("#markBadcase").addEventListener("click", markBadcase);
-$("#statusFilter").addEventListener("change", renderTasks);
-$("#searchBox").addEventListener("input", renderTasks);
-document.addEventListener("click", (event) => {
-  const viewButton = event.target.closest("[data-view]");
-  if (viewButton) switchView(viewButton.dataset.view);
+function renderProfiles() {
+  const rows = filteredProfiles();
+  $("#resultCount").textContent = `当前展示 ${rows.length} 条画像资产`;
 
-  const button = event.target.closest("[data-task]");
-  if (button) selectTask(button.dataset.task);
+  if (!rows.length) {
+    $("#profileList").innerHTML = `<div class="empty">没有匹配结果，换一个关键词或筛选条件。</div>`;
+    return;
+  }
+
+  $("#profileList").innerHTML = rows.map((profile) => {
+    const isActive = state.selectedId === `${profile.role}:${profile.id}`;
+    const title = getRecordTitle(profile);
+    const metrics = (profile.metrics || [])
+      .filter(([key]) => !String(key).toLowerCase().includes("qa"))
+      .map(([key, value]) => `
+        <div><span>${escapeHtml(metricLabel(key))}</span><b>${escapeHtml(value)}</b></div>
+      `).join("");
+    const tags = (profile.tags || []).filter(Boolean).slice(0, 4).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
+    const summary = cleanSummary(profile.summary);
+    return `
+      <article class="profile-card role-${profile.role} ${isActive ? "active" : ""}" data-profile-key="${profile.role}:${profile.id}">
+        <div class="avatar role-${profile.role}">${roleAvatar(profile.role)}</div>
+        <div class="profile-main">
+          <div class="profile-head">
+            <div>
+              <h3>${escapeHtml(title)}</h3>
+              <p>ID: ${escapeHtml(profile.id)} · ${escapeHtml(profile.subtitle || profile.p_date)}</p>
+            </div>
+            <em>${roleLabel(profile.role)}</em>
+          </div>
+          <p class="summary">${escapeHtml(summary).slice(0, 180)}</p>
+          <div class="tag-row">${tags}</div>
+          <div class="metric-row">${metrics}</div>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderKeyValue(record, keys) {
+  return keys
+    .filter((key) => record[key] !== undefined && record[key] !== "")
+    .map((key) => `<dt>${escapeHtml(metricLabel(key))}</dt><dd>${escapeHtml(record[key])}</dd>`)
+    .join("");
+}
+
+function renderObjectSections(title, data) {
+  if (!data || typeof data !== "object") return "";
+  const sections = Object.entries(data)
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .map(([key, value]) => {
+      const body = typeof value === "object"
+        ? Object.entries(value).map(([k, v]) => `<li><b>${escapeHtml(k)}</b><span>${escapeHtml(v)}</span></li>`).join("")
+        : `<li><span>${escapeHtml(value)}</span></li>`;
+      return `<article class="section-card"><h4>${escapeHtml(key)}</h4><ul>${body}</ul></article>`;
+    }).join("");
+  if (!sections) return "";
+  return `<section class="detail-section"><h3>${escapeHtml(title)}</h3><div class="section-grid">${sections}</div></section>`;
+}
+
+function syncQueryForm(profile) {
+  if (!profile) return;
+  const queryRole = $("#queryRole");
+  const queryId = $("#queryId");
+  queryRole.value = String(profile.role);
+  queryId.value = profile.id;
+}
+
+function renderDetail(profile) {
+  if (!profile) {
+    $("#profileDetail").innerHTML = `<div class="empty">选择一条画像后，这里展示底表字段和画像字段。</div>`;
+    return;
+  }
+
+  const record = profile.record || {};
+  const isMerchant = Number(profile.role) === 1;
+  const rawKeys = isMerchant
+    ? ["p_date", "merchant_id", "first_industry_name", "author_ks_id", "is_open_robot_valid", "merchant_name", "corporation_name", "user_name", "user_text", "guide_words"]
+    : ["user_id", "p_date", "source_table"];
+  const profileData = isMerchant ? record.merchant_profile : record.user_profile;
+
+  $("#detailSubtitle").textContent = `${roleLabel(profile.role)} · ${profile.source_table}`;
+  syncQueryForm(profile);
+  $("#profileDetail").innerHTML = `
+    <section class="identity-card">
+      <div class="avatar large role-${profile.role}">${roleAvatar(profile.role)}</div>
+      <div>
+        <h2>${escapeHtml(getRecordTitle(profile))}</h2>
+        <p>${escapeHtml(profile.subtitle || "")}</p>
+        <small>来源表：${escapeHtml(profile.source_table || "")}</small>
+        <div class="tag-row">${(profile.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
+      </div>
+    </section>
+
+    <section class="detail-section">
+      <h3>底表原始字段</h3>
+      <dl class="field-dl">${renderKeyValue(record, rawKeys)}</dl>
+    </section>
+
+    ${renderObjectSections(isMerchant ? "商家画像" : "用户画像", profileData)}
+  `;
+}
+
+function selectFirstVisible() {
+  const first = filteredProfiles()[0];
+  if (first) {
+    state.selectedId = `${first.role}:${first.id}`;
+    renderDetail(first);
+  } else {
+    state.selectedId = "";
+    renderDetail(null);
+  }
+}
+
+function profileFromOfflineRecord(userRole, offlineRecord) {
+  return Number(userRole) === 1
+    ? {
+        role: 1,
+        id: String(offlineRecord.merchant_id),
+        title: offlineRecord.merchant_name || offlineRecord.user_name,
+        subtitle: offlineRecord.first_industry_name,
+        source_table: offlineRecord.source_table,
+        tags: [offlineRecord.first_industry_name, normalizeRobotStatus(offlineRecord.is_open_robot_valid)].filter(Boolean),
+        summary: offlineRecord.merchant_profile?.["主营商品/服务"] || offlineRecord.merchant_profile?.["经营业务范围"] || offlineRecord.user_text,
+        metrics: [
+          ["画像字段", Object.keys(offlineRecord.merchant_profile || {}).filter((key) => offlineRecord.merchant_profile[key]).length],
+          ["author_ks_id", offlineRecord.author_ks_id || "-"],
+          ["智能客服", normalizeRobotStatus(offlineRecord.is_open_robot_valid)],
+        ],
+        record: offlineRecord,
+      }
+    : {
+        role: 2,
+        id: String(offlineRecord.user_id),
+        title: `用户 ${offlineRecord.user_id}`,
+        subtitle: offlineRecord.user_profile?.["基础画像"]?.["居住城市"],
+        source_table: offlineRecord.source_table,
+        tags: Object.values(offlineRecord.user_profile?.["基础画像"] || {}).slice(0, 3),
+        summary: offlineRecord.result,
+        metrics: [
+          ["板块", Object.keys(offlineRecord.user_profile || {}).filter((key) => typeof offlineRecord.user_profile[key] === "object").length],
+          ["设备", offlineRecord.user_profile?.["基础画像"]?.["使用设备"] || "-"],
+          ["价格敏感", offlineRecord.user_profile?.["电商与广告行为特征"]?.["价格敏感度"] || "-"],
+        ],
+        record: offlineRecord,
+      };
+}
+
+function upsertProfile(profile) {
+  const key = `${profile.role}:${profile.id}`;
+  const index = state.profiles.findIndex((item) => `${item.role}:${item.id}` === key);
+  if (index >= 0) {
+    state.profiles[index] = { ...state.profiles[index], ...profile };
+  } else {
+    state.profiles = [profile, ...state.profiles];
+  }
+  state.selectedId = key;
+}
+
+function selectProfile(profile) {
+  if (!profile) return;
+  state.selectedId = `${profile.role}:${profile.id}`;
+  syncQueryForm(profile);
+  renderProfiles();
+  renderDetail(profile);
+}
+
+function selectFirstByRole(role) {
+  const profile = filteredProfiles().find((item) => String(item.role) === String(role))
+    || state.profiles.find((item) => String(item.role) === String(role));
+  if (profile) selectProfile(profile);
+}
+
+async function loadProfiles() {
+  const response = await fetch("/api/profileList?limit=36");
+  const json = await response.json();
+  const data = json.data || {};
+  state.meta = data.meta || {};
+  state.profiles = [...(data.users || []), ...(data.merchants || [])];
+  refreshFilters();
+  selectFirstVisible();
+  renderProfiles();
+}
+
+async function queryProfile(event) {
+  event.preventDefault();
+  const payload = {
+    user_role: Number($("#queryRole").value),
+    user_id: $("#queryId").value.trim(),
+    context: serviceContext(),
+  };
+  if (!payload.user_id) return;
+  $("#queryStatus").textContent = "查询中...";
+  try {
+    const response = await fetch("/api/queryUserProfile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    $("#queryStatus").textContent = json.ok ? `查询成功：${sourceLabel(json.source)}` : `查询失败：${json.message || json.error}`;
+    const offlineRecord = json.data?.offline_record;
+    if (offlineRecord) {
+      const profile = profileFromOfflineRecord(payload.user_role, offlineRecord);
+      upsertProfile(profile);
+      state.role = "all";
+      state.industry = "all";
+      state.facets = {};
+      state.keyword = "";
+      $("#keywordInput").value = "";
+      $$("[data-role]").forEach((item) => item.classList.toggle("active", item.dataset.role === "all"));
+      $$("[data-industry]").forEach((item) => item.classList.toggle("active", item.dataset.industry === "all"));
+      $$(".side-item").forEach((item) => item.classList.toggle("active", item.dataset.section === "market"));
+      refreshFilters();
+      renderProfiles();
+      renderDetail(profile);
+    }
+  } catch (error) {
+    $("#queryStatus").textContent = error.message;
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-profile-key]");
+  if (card) {
+    state.selectedId = card.dataset.profileKey;
+    const profile = state.profiles.find((item) => `${item.role}:${item.id}` === state.selectedId);
+    selectProfile(profile);
+    return;
+  }
+
+  const roleButton = event.target.closest("[data-role]");
+  if (roleButton) {
+    state.role = roleButton.dataset.role;
+    state.facets = {};
+    $$(".side-item").forEach((item) => item.classList.toggle("active", item.dataset.section === "market"));
+    $$("[data-role]").forEach((item) => item.classList.toggle("active", item === roleButton));
+    refreshFilters();
+    selectFirstVisible();
+    renderProfiles();
+    return;
+  }
+
+  const industryButton = event.target.closest("[data-industry]");
+  if (industryButton) {
+    state.industry = industryButton.dataset.industry;
+    $$(".side-item").forEach((item) => item.classList.toggle("active", item.dataset.section === "market"));
+    $$("[data-industry]").forEach((item) => item.classList.toggle("active", item === industryButton));
+    renderActiveFilters();
+    selectFirstVisible();
+    renderProfiles();
+    return;
+  }
+
+  const sideButton = event.target.closest("[data-section]");
+  if (sideButton) {
+    const section = sideButton.dataset.section;
+    $$(".side-item").forEach((item) => item.classList.toggle("active", item === sideButton));
+    state.role = section === "user" ? "2" : section === "market" ? "all" : "1";
+    state.keyword = "";
+    state.industry = "all";
+    state.facets = {};
+    $("#keywordInput").value = state.keyword;
+    $$("[data-role]").forEach((item) => item.classList.toggle("active", item.dataset.role === state.role));
+    $$("[data-industry]").forEach((item) => item.classList.toggle("active", item.dataset.industry === "all"));
+    refreshFilters();
+    selectFirstVisible();
+    renderProfiles();
+  }
 });
 
-async function bootstrapDemo() {
-  initSelectors();
-  await confirmMerchant();
-  await syncProfiles();
-  switchView("overview");
-}
+document.addEventListener("change", (event) => {
+  const select = event.target.closest("[data-facet]");
+  if (!select) return;
+  const value = select.value;
+  if (value === "all") {
+    delete state.facets[select.dataset.facet];
+  } else {
+    state.facets[select.dataset.facet] = value;
+  }
+  renderActiveFilters();
+  selectFirstVisible();
+  renderProfiles();
+});
 
-bootstrapDemo();
+$("#resetFilters").addEventListener("click", resetFilters);
+
+$("#searchForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  state.keyword = $("#keywordInput").value;
+  selectFirstVisible();
+  renderProfiles();
+});
+
+$("#keywordInput").addEventListener("input", (event) => {
+  state.keyword = event.target.value;
+  selectFirstVisible();
+  renderProfiles();
+});
+
+$("#sortSelect").addEventListener("change", (event) => {
+  state.sort = event.target.value;
+  selectFirstVisible();
+  renderProfiles();
+});
+
+$("#queryRole").addEventListener("change", (event) => {
+  selectFirstByRole(event.target.value);
+});
+
+$("#queryForm").addEventListener("submit", queryProfile);
+
+loadProfiles().catch((error) => {
+  $("#profileList").innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+});
