@@ -28,9 +28,10 @@ public class ManualKrpcUserProfileConfig {
             @Value("${profile.adapter.krpc.biz-name:ad-industry-ai-studio-center}") String bizName,
             @Value("${profile.adapter.krpc.registry-name:${profile.adapter.krpc.biz-name:ad-industry-ai-studio-center}}") String registryName,
             @Value("${profile.adapter.krpc.port:0}") int port,
-            @Value("${profile.adapter.krpc.timeout-ms:5000}") long timeoutMs
+            @Value("${profile.adapter.krpc.timeout-ms:5000}") long timeoutMs,
+            @Value("${profile.adapter.krpc.division:staging}") String division
     ) {
-        RpcConfig rpcConfig = new UserProfileRpcConfig(bizDef, bizName, registryName, port);
+        RpcConfig rpcConfig = new UserProfileRpcConfig(bizDef, bizName, registryName, port, division);
         return GrpcClient.create(rpcConfig)
                 .toGrpcCore()
                 .getClient(
@@ -43,7 +44,8 @@ public class ManualKrpcUserProfileConfig {
             String bizDefName,
             String bizName,
             String registryName,
-            int port
+            int port,
+            String division
     ) implements RpcConfig {
 
         @Override
@@ -78,6 +80,11 @@ public class ManualKrpcUserProfileConfig {
             } catch (IllegalArgumentException ignored) {
                 return BizDef.AD_INDUSTRY_INFRA_AIGC;
             }
+        }
+
+        @Override
+        public String division() {
+            return division;
         }
     }
 }
