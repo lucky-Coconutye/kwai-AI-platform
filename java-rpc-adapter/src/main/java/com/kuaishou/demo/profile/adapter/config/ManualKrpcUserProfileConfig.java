@@ -31,6 +31,10 @@ public class ManualKrpcUserProfileConfig {
             @Value("${profile.adapter.krpc.timeout-ms:5000}") long timeoutMs,
             @Value("${profile.adapter.krpc.division:staging}") String division
     ) {
+        // Explicitly set division system property before creating KRPC client
+        System.setProperty("kess.division", division);
+        System.setProperty("kess.config.division", division);
+        
         RpcConfig rpcConfig = new UserProfileRpcConfig(bizDef, bizName, registryName, port, division);
         return GrpcClient.create(rpcConfig)
                 .toGrpcCore()
