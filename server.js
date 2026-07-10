@@ -11,7 +11,7 @@ const queryUserProfileUrl = process.env.QUERY_USER_PROFILE_HTTP_URL || "";
 const queryUserProfileToken = process.env.QUERY_USER_PROFILE_TOKEN || "";
 const queryUserProfileCookie = process.env.QUERY_USER_PROFILE_COOKIE || "";
 const queryUserProfileTimeoutMs = Number(process.env.QUERY_USER_PROFILE_TIMEOUT_MS || 8000);
-const defaultBizCode = process.env.QUERY_USER_PROFILE_BIZ_CODE || "business_platform";
+const defaultBizCode = process.env.QUERY_USER_PROFILE_BIZ_CODE || "demo";
 const offlineProfileFile = path.join(root, "mock-data", "profiles.json");
 const offlineMerchantProfileFile = path.join(root, "mock-data", "merchant_profiles.json");
 
@@ -138,7 +138,7 @@ function compactMerchant(record) {
     id: String(record.merchant_id || ""),
     title: record.merchant_name || record.user_name || `商家 ${record.merchant_id}`,
     subtitle: record.first_industry_name || "未知行业",
-    source_table: record.source_table || "ks_mmu.pi_merchant_profile_generation_record",
+    source_table: record.source_table || "demo.merchant_profile_records",
     p_date: record.p_date || "",
     tags: [
       record.first_industry_name,
@@ -164,7 +164,7 @@ function compactUser(record) {
     id: String(record.user_id || ""),
     title: `用户 ${record.user_id}`,
     subtitle: base["居住城市"] || "普通用户",
-    source_table: record.source_table || "ks_mmu.llm_u2_user_description_white_box_td",
+    source_table: record.source_table || "demo.user_profile_records",
     p_date: record.p_date || "",
     tags: [base["年龄段"], base["消费水平标签"], interest["核心兴趣垂类"]].filter(Boolean).slice(0, 4),
     summary: record.result || "暂无用户画像摘要",
@@ -193,8 +193,8 @@ function listOfflineProfiles(limit = 30) {
     users,
     merchants,
     meta: {
-      user_table: "ks_mmu.llm_u2_user_description_white_box_td",
-      merchant_table: "ks_mmu.pi_merchant_profile_generation_record",
+      user_table: "demo.user_profile_records",
+      merchant_table: "demo.merchant_profile_records",
       merchant_record_count: merchantData.record_count || merchants.length,
       source: queryUserProfileUrl ? "live-proxy-ready" : "offline",
     },
@@ -341,9 +341,9 @@ http.createServer((req, res) => {
   const displayHost = host === "0.0.0.0" ? "127.0.0.1" : host;
   console.log(`底表画像数据展示平台已启动：http://${displayHost}:${port}`);
   if (queryUserProfileUrl) {
-    console.log(`QueryUserProfile 实时代理已配置：${queryUserProfileUrl}`);
+    console.log(`画像查询实时代理已配置：${queryUserProfileUrl}`);
   } else {
-    console.log("QueryUserProfile 实时代理未配置，将使用本地离线样例数据");
+    console.log("画像查询实时代理未配置，将使用本地离线样例数据");
   }
   if (host === "0.0.0.0") console.log(`局域网访问：使用本机局域网 IP + 端口 ${port}`);
   console.log("按 Ctrl+C 停止服务");

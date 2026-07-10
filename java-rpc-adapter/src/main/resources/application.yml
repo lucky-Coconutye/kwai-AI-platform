@@ -4,27 +4,8 @@ server:
 spring:
   application:
     name: profile-rpc-adapter
-  cloud:
-    kess:
-      config:
-        enabled: true
-        division: staging
-
-kess:
-  division: staging
-  config:
-    division: staging
 
 profile:
   adapter:
-    biz-code: business_platform
+    biz-code: demo
     mock-enabled: false
-    krpc:
-      manual-enabled: true
-      biz-def: AD_INDUSTRY_INFRA_AIGC
-      biz-name: ad-industry-infra-aigc-studio-serivce
-      registry-name: ad-industry-ai-studio-center
-      disable-auto-grpc-prefix: true
-      port: 0
-      timeout-ms: 5000
-      division: staging

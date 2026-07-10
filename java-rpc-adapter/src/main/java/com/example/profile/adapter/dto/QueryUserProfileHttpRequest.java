@@ -1,4 +1,4 @@
-package com.kuaishou.demo.profile.adapter.dto;
+package com.example.profile.adapter.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;

@@ -3,7 +3,7 @@
     {
       "user_id": "1000000001",
       "p_date": "20260702",
-      "source_table": "ks_mmu.llm_u2_user_description_white_box_td",
+      "source_table": "demo.user_profile_records",
       "result": "## 基础画像\n示例用户为24-30岁女性，常驻新一线城市，未婚未育，使用iPhone设备，消费水平中等，对价格有一定敏感度。\n\n## 视频兴趣与内容偏好\n偏好美食、生活服务、学习成长和旅游风光内容。\n\n## 电商与广告行为特征\n更容易被真实体验、福利明确、场景化广告触达。\n\n## 潜在需求与推荐策略\n适合推荐本地生活、课程培训、轻量消费品和到店服务。",
       "user_profile": {
         "user_id": "1000000001",
@@ -35,7 +35,7 @@
     {
       "user_id": "1000000002",
       "p_date": "20260702",
-      "source_table": "ks_mmu.llm_u2_user_description_white_box_td",
+      "source_table": "demo.user_profile_records",
       "result": "## 基础画像\n示例用户为31-40岁男性，常驻二线城市，已婚已育，使用安卓设备，消费水平中低，价格敏感度高。\n\n## 视频兴趣与内容偏好\n偏好汽车、数码、家庭生活和本地服务内容。\n\n## 电商与广告行为特征\n更关注性价比、售后保障和真实测评。\n\n## 潜在需求与推荐策略\n适合推荐汽车服务、家电数码、本地到店和家庭消费内容。",
       "user_profile": {
         "user_id": "1000000002",
@@ -68,7 +68,7 @@
     {
       "merchant_id": "2000000001",
       "p_date": "20260702",
-      "source_table": "ks_mmu.pi_merchant_profile_generation_record",
+      "source_table": "demo.merchant_profile_records",
       "first_industry_name": "教育培训",
       "author_ks_id": "900000001",
       "is_open_robot_valid": "是",
@@ -93,7 +93,7 @@
     {
       "merchant_id": "2000000002",
       "p_date": "20260702",
-      "source_table": "ks_mmu.pi_merchant_profile_generation_record",
+      "source_table": "demo.merchant_profile_records",
       "first_industry_name": "生活服务",
       "author_ks_id": "900000002",
       "is_open_robot_valid": "否",

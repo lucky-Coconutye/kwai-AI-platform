@@ -1,6 +1,6 @@
-package com.kuaishou.demo.profile.adapter.client;
+package com.example.profile.adapter.client;
 
-import com.kuaishou.demo.profile.adapter.dto.QueryUserProfileHttpRequest;
+import com.example.profile.adapter.dto.QueryUserProfileHttpRequest;
 import java.util.Map;
 
 public interface UserProfileClient {

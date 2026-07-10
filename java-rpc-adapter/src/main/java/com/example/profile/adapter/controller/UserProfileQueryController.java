@@ -1,8 +1,8 @@
-package com.kuaishou.demo.profile.adapter.controller;
+package com.example.profile.adapter.controller;
 
-import com.kuaishou.demo.profile.adapter.client.UserProfileClient;
-import com.kuaishou.demo.profile.adapter.dto.QueryUserProfileHttpRequest;
-import com.kuaishou.demo.profile.adapter.dto.QueryUserProfileHttpResponse;
+import com.example.profile.adapter.client.UserProfileClient;
+import com.example.profile.adapter.dto.QueryUserProfileHttpRequest;
+import com.example.profile.adapter.dto.QueryUserProfileHttpResponse;
 import jakarta.validation.Valid;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,7 +23,7 @@ public class UserProfileQueryController {
 
     public UserProfileQueryController(
             UserProfileClient userProfileClient,
-            @Value("${profile.adapter.biz-code:business_platform}") String defaultBizCode
+            @Value("${profile.adapter.biz-code:demo}") String defaultBizCode
     ) {
         this.userProfileClient = userProfileClient;
         this.defaultBizCode = defaultBizCode;

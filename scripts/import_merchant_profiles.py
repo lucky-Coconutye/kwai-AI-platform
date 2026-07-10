@@ -29,7 +29,7 @@ def normalize_row(row):
     return {
         "p_date": row.get("p_date", ""),
         "merchant_id": merchant_id,
-        "source_table": "ks_mmu.pi_merchant_profile_generation_record",
+        "source_table": "demo.merchant_profile_records",
         "first_industry_name": row.get("first_industry_name", ""),
         "author_ks_id": row.get("author_ks_id", ""),
         "is_open_robot_valid": row.get("is_open_robot_valid", ""),

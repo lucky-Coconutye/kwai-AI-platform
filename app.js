@@ -44,7 +44,7 @@ function shortText(value, limit = 18) {
 
 function serviceContext() {
   return {
-    biz_code: "business_platform",
+    biz_code: "demo",
     session_id: "",
     user_id: "0",
     account_id: "0",

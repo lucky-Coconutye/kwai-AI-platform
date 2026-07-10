@@ -1,4 +1,4 @@
-package com.kuaishou.demo.profile.adapter.dto;
+package com.example.profile.adapter.dto;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

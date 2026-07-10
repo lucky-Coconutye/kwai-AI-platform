@@ -1,13 +1,11 @@
-package com.kuaishou.demo.profile.adapter.client;
+package com.example.profile.adapter.client;
 
-import com.kuaishou.demo.profile.adapter.dto.QueryUserProfileHttpRequest;
+import com.example.profile.adapter.dto.QueryUserProfileHttpRequest;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("!krpc")
 public class MockUserProfileClient implements UserProfileClient {
 
     @Override

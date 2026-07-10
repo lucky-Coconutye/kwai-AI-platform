@@ -5,7 +5,7 @@
     "2000000001": {
       "merchant_id": "2000000001",
       "p_date": "20260702",
-      "source_table": "ks_mmu.pi_merchant_profile_generation_record",
+      "source_table": "demo.merchant_profile_records",
       "first_industry_name": "教育培训",
       "author_ks_id": "900000001",
       "is_open_robot_valid": "是",
@@ -30,7 +30,7 @@
     "2000000002": {
       "merchant_id": "2000000002",
       "p_date": "20260702",
-      "source_table": "ks_mmu.pi_merchant_profile_generation_record",
+      "source_table": "demo.merchant_profile_records",
       "first_industry_name": "生活服务",
       "author_ks_id": "900000002",
       "is_open_robot_valid": "否",
