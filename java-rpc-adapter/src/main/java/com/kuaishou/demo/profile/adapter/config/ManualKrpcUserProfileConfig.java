@@ -1,7 +1,6 @@
 package com.kuaishou.demo.profile.adapter.config;
 
 import com.kuaishou.ad.industry.ai.studio.center.protobuf.AdAiStudioUserProfileServiceGrpc;
-import com.kuaishou.ad.industry.ai.studio.center.protobuf.KrpcAdAiStudioUserProfileServiceGrpc;
 import com.kuaishou.framework.rpc.client.n.GrpcClient;
 import com.kuaishou.framework.rpc.config.n.RpcConfig;
 import com.kuaishou.framework.warmup.Warmuper;
@@ -22,11 +21,12 @@ public class ManualKrpcUserProfileConfig {
     // If the company runtime already provides this bean, ConditionalOnMissingBean keeps that one.
 
     @Bean
-    @ConditionalOnMissingBean(KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService.class)
-    public KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService userProfileService(
+    @ConditionalOnMissingBean(AdAiStudioUserProfileServiceGrpc.AdAiStudioUserProfileServiceFutureClient.class)
+    public AdAiStudioUserProfileServiceGrpc.AdAiStudioUserProfileServiceFutureClient userProfileService(
             @Value("${profile.adapter.krpc.biz-def:AD_INDUSTRY_INFRA_AIGC}") String bizDef,
-            @Value("${profile.adapter.krpc.biz-name:ad-industry-ai-studio-center}") String bizName,
-            @Value("${profile.adapter.krpc.registry-name:${profile.adapter.krpc.biz-name:ad-industry-ai-studio-center}}") String registryName,
+            @Value("${profile.adapter.krpc.biz-name:ad-industry-infra-aigc-studio-serivce}") String bizName,
+            @Value("${profile.adapter.krpc.registry-name:ad-industry-ai-studio-center}") String registryName,
+            @Value("${profile.adapter.krpc.disable-auto-grpc-prefix:false}") boolean disableAutoGrpcPrefix,
             @Value("${profile.adapter.krpc.port:0}") int port,
             @Value("${profile.adapter.krpc.timeout-ms:5000}") long timeoutMs,
             @Value("${profile.adapter.krpc.division:staging}") String division
@@ -35,11 +35,11 @@ public class ManualKrpcUserProfileConfig {
         System.setProperty("kess.division", division);
         System.setProperty("kess.config.division", division);
         
-        RpcConfig rpcConfig = new UserProfileRpcConfig(bizDef, bizName, registryName, port, division);
+        RpcConfig rpcConfig = new UserProfileRpcConfig(bizDef, bizName, registryName, disableAutoGrpcPrefix, port, division);
         return GrpcClient.create(rpcConfig)
                 .toGrpcCore()
                 .getClient(
-                        KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService.class,
+                        AdAiStudioUserProfileServiceGrpc.AdAiStudioUserProfileServiceFutureClient.class,
                         Duration.ofMillis(timeoutMs)
                 );
     }
@@ -48,6 +48,7 @@ public class ManualKrpcUserProfileConfig {
             String bizDefName,
             String bizName,
             String registryName,
+            boolean disableAutoGrpcPrefix,
             int port,
             String division
     ) implements RpcConfig {
@@ -70,6 +71,11 @@ public class ManualKrpcUserProfileConfig {
         @Override
         public String bizNameForRegistry() {
             return registryName;
+        }
+
+        @Override
+        public boolean disableAutoGrpcPrefix() {
+            return disableAutoGrpcPrefix;
         }
 
         @Override

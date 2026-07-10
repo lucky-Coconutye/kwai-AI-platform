@@ -2,3 +2,4 @@
 .m2-repository/
 target/
 java-rpc-adapter/target/
+java-rpc-adapter/backups/

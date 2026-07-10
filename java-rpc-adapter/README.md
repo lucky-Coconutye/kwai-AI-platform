@@ -1,10 +1,10 @@
-# Java RPC Adapter for QueryUserProfile
+# Java HTTP Adapter for QueryUserProfile
 
 当前前端 demo 是静态前端 + Node 本地服务，不能直接引入 Maven/KRPC 依赖。这里补了一个最小 Java HTTP Adapter 工程：
 
 前端 demo -> Node server.js -> Java HTTP Adapter -> KRPC QueryUserProfile
 
-## 本地先跑通
+## 本地先跑通 HTTP 层
 
 默认是 mock client，可以先验证 Java HTTP 层是否通：
 
@@ -55,14 +55,34 @@ http://127.0.0.1:8090
 
 ## 切真实 KRPC
 
-KDev 中看到的依赖版本是：
+当前工程通过 `krpc` profile 创建 KRPC client，核心调用代码在：
+
+```text
+src/main/java/com/kuaishou/demo/profile/adapter/client/KrpcUserProfileClient.java
+```
+
+实际调用的 stub 和方法是：
+
+```java
+AdAiStudioUserProfileServiceGrpc.AdAiStudioUserProfileServiceFutureClient#queryUserProfile
+```
+
+对应服务注册配置在 `src/main/resources/application.yml`：
+
+```yaml
+profile:
+  adapter:
+    krpc:
+      biz-def: AD_INDUSTRY_INFRA_AIGC
+      biz-name: ad-industry-infra-aigc-studio-serivce
+      registry-name: ad-industry-ai-studio-center
+      disable-auto-grpc-prefix: true
+      division: staging
+```
+
+依赖版本：
 
 ```xml
-<dependency>
-  <groupId>kuaishou</groupId>
-  <artifactId>ad-industry-ai-studio-center-parent</artifactId>
-  <version>1.0.234</version>
-</dependency>
 <dependency>
   <groupId>kuaishou</groupId>
   <artifactId>ad-industry-ai-studio-center-client</artifactId>
@@ -70,17 +90,17 @@ KDev 中看到的依赖版本是：
 </dependency>
 ```
 
-本工程已在 `pom.xml` 的 `krpc` profile 里放好。真正接入时需要：
+启动真实 KRPC profile：
 
-1. 打开 `src/main/java/com/kuaishou/demo/profile/adapter/client/KrpcUserProfileClient.java`
-2. 按公司真实包名补齐 import。
-3. 按公司 KRPC 方式注入：
-
-```java
-private KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService userProfileService;
+```bash
+mvn spring-boot:run \
+  -Dspring-boot.run.profiles=krpc \
+  -Dspring-boot.run.jvmArguments="--add-exports=java.base/sun.net.util=ALL-UNNAMED"
 ```
 
-4. 把 HTTP 请求转换成 `QueryUserProfileRequest`：
+`--add-exports` 是为了兼容当前 KRPC 依赖在 Java 17 下访问 JDK 内部网络工具类的行为。
+
+HTTP 请求会被转换成 `QueryUserProfileRequest`：
 
 ```text
 context.biz_code = business_platform
@@ -88,15 +108,8 @@ user_role = 1 商家 / 2 普通用户
 user_id = 商家ID / 用户ID
 ```
 
-5. 使用真实 profile 启动：
+## 排查提示
 
-```bash
-mvn spring-boot:run -Pkrpc -Dspring-boot.run.profiles=krpc
-```
-
-## 还需要老师/后端补齐的信息
-
-- `KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService` 的真实 Java import。
-- `QueryUserProfileRequest`、`QueryUserProfileResponse`、`ServiceContext` 的真实 Java import。
-- 公司 KRPC 注入注解和本地启动配置。
-- `business_platform` 的调用权限是否已开通。
+- `rpc.connSuccess.ad-industry-ai-studio-center` 表示 KRPC 连接成功。
+- `rpc.succ.ad-industry-ai-studio-center.queryUserProfile` 表示 `queryUserProfile` 调用成功返回。
+- 如果返回 `success` 但画像字段为空，通常需要服务端确认当前 division、biz_code、权限和测试 ID 是否能命中真实画像数据。

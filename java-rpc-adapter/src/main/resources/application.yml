@@ -22,8 +22,9 @@ profile:
     krpc:
       manual-enabled: true
       biz-def: AD_INDUSTRY_INFRA_AIGC
-      biz-name: ad-industry-ai-studio-center
+      biz-name: ad-industry-infra-aigc-studio-serivce
       registry-name: ad-industry-ai-studio-center
+      disable-auto-grpc-prefix: true
       port: 0
       timeout-ms: 5000
       division: staging

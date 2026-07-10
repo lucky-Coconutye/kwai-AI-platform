@@ -1,15 +1,64 @@
-# 底表画像数据展示平台 Demo
+# 画像资产平台 Demo
 
-这个 Demo 的目标是把两张画像底表能提供的数据，以平台产品的方式展示出来：
+这是一个面向面试展示的画像数据产品 Demo。项目把“用户画像”和“商家画像”两类底表数据包装成一个可交互的资产工作台，支持画像检索、条件筛选、详情查看和实时查询链路演示。
 
-- 用户画像底表：`ks_mmu.llm_u2_user_description_white_box_td`
-- 商家画像记录表：`ks_mmu.pi_merchant_profile_generation_record`
+在线评审或本地运行时，访问者不需要公司内网依赖也能看到完整产品形态：GitHub 版本内置了脱敏样例数据，默认会走本地离线查询；如果在公司网络环境中配置 Java/KRPC Adapter，也可以把同一套前端切换到真实 `QueryUserProfile` 服务。
 
-页面只展示表里已有的画像核心数据项：用户 `result` / `user_profile`、商家基础字段、`merchant_profile` 和实时查询。
+## 项目目标
 
-当前版本支持离线查询：未配置真实 RPC/HTTP 地址时，`/api/queryUserProfile` 会自动查询 `mock-data/profiles.json` 和 `mock-data/merchant_profiles.json`。
+这个项目用于展示以下能力：
 
-## 启动
+- 将离线画像底表抽象成可检索、可筛选、可查看详情的平台化产品界面。
+- 支持用户画像与商家画像两种对象类型，并用统一交互承载不同字段结构。
+- 在无后端依赖时使用 mock 数据完整演示，在有公司 KRPC 环境时切换到真实服务调用。
+- 用 Node 本地服务解决前端同源 API、静态资源托管和后端代理问题。
+- 用 Java HTTP Adapter 演示浏览器前端如何间接打通公司内 KRPC 服务。
+
+## 功能概览
+
+- **画像市场**：集中展示用户画像和商家画像卡片。
+- **关键词搜索**：支持按用户 ID、商家 ID、行业、服务、兴趣等字段搜索。
+- **结构化筛选**：支持画像类型、行业/标签和画像字段条件筛选。
+- **画像详情**：展示底表原始字段和结构化画像字段。
+- **实时查询**：右侧输入画像 ID，可查询用户或商家画像。
+- **离线兜底**：未配置真实后端时自动读取 `mock-data/` 中的脱敏样例。
+- **KRPC 接入骨架**：`java-rpc-adapter/` 提供 HTTP 到 KRPC 的适配层。
+
+## 技术架构
+
+```text
+浏览器页面
+  -> Node server.js
+     -> mock-data 离线样例数据
+     -> Java HTTP Adapter
+        -> KESS/KRPC
+           -> QueryUserProfile 服务
+```
+
+前端始终只请求同源接口：
+
+```text
+GET  /api/profileList
+POST /api/queryUserProfile
+```
+
+这样浏览器不需要直接处理 KRPC SDK、公司内网依赖或跨域问题。
+
+## 目录结构
+
+```text
+.
+├── index.html                  # 页面结构
+├── styles.css                  # 页面样式
+├── app.js                      # 前端交互、筛选、查询和详情渲染
+├── server.js                   # Node 静态服务与 API 代理
+├── start.sh                    # 一键启动前端 Demo
+├── mock-data/                  # 脱敏离线样例数据
+├── scripts/                    # 数据导入脚本
+└── java-rpc-adapter/           # Java HTTP -> KRPC Adapter
+```
+
+## 快速启动
 
 ```bash
 git clone https://github.com/lucky-Coconutye/kwai-AI-platform.git
@@ -23,18 +72,39 @@ sh start.sh
 http://127.0.0.1:8090
 ```
 
-换端口：
+修改端口：
 
 ```bash
 PORT=8080 sh start.sh
 ```
 
-## QueryUserProfile 请求
+默认情况下不需要配置任何后端服务，页面会使用脱敏离线样例数据。
 
-业务 bizCode：
+## 可测试样例 ID
+
+离线样例数据中内置了以下 ID：
 
 ```text
-business_platform
+用户：1000000001、1000000002
+商家：2000000001、2000000002
+```
+
+页面右侧「画像查询」表单可以直接输入这些 ID 验证查询链路。
+
+## API 说明
+
+### 查询画像列表
+
+```text
+GET /api/profileList?limit=36
+```
+
+返回用户画像和商家画像的卡片化摘要数据。
+
+### 查询单个画像
+
+```text
+POST /api/queryUserProfile
 ```
 
 查询用户画像：
@@ -42,108 +112,112 @@ business_platform
 ```json
 {
   "user_role": 2,
-  "user_id": "1839980743",
+  "user_id": "1000000001",
   "context": {
-    "biz_code": "business_platform",
-    "session_id": "",
-    "user_id": "0",
-    "account_id": "0",
-    "merchant_id": "0",
-    "username": "",
-    "request_id": "",
-    "agent_name": "",
-    "scene_id": 0,
-    "scene_type": 0,
-    "scene_name": "",
-    "token": "",
-    "ability_name": "",
-    "invoker": ""
+    "biz_code": "business_platform"
   }
 }
 ```
 
-查询商家画像时只需要改：
+查询商家画像：
 
 ```json
 {
   "user_role": 1,
-  "user_id": "商家ID"
+  "user_id": "2000000001",
+  "context": {
+    "biz_code": "business_platform"
+  }
 }
 ```
 
-其中 `user_role=1` 表示商家，`user_role=2` 表示普通用户。
-
-## 本地代理
-
-前端可以请求本地 Node 服务：
+字段约定：
 
 ```text
-POST /api/queryUserProfile
+user_role=1 表示商家
+user_role=2 表示普通用户
+biz_code=business_platform
 ```
 
-页面里的「实时查询」会直接调用这个接口。未接入 Java/KRPC Adapter 时，会展示本地离线样例数据；接入后会展示真实返回。
+## 接入真实 KRPC 服务
 
-GitHub 版本仅保留脱敏样例数据，方便任何人直接启动验证。
-
-离线样例 ID：
+当前仓库包含一个 Java Adapter，用来把 HTTP 请求转成公司内 KRPC 调用：
 
 ```text
-用户：1000000001、1000000002
-商家：2000000001、2000000002
+前端页面 -> Node server.js -> Java HTTP Adapter -> KRPC QueryUserProfile
 ```
 
-如果公司内真实服务只能通过 Java/KRPC 调用，需要先起一个 Java HTTP Adapter，再让当前 Demo 转发过去。本仓库已补一个可启动的 Adapter 骨架：
+先启动 Java Adapter：
 
 ```bash
 cd java-rpc-adapter
 sh start.sh
 ```
 
-再启动前端 Demo：
+健康检查：
+
+```text
+GET http://127.0.0.1:8081/api/health
+```
+
+再启动前端 Demo，并让 Node 代理到 Java Adapter：
 
 ```bash
+cd ..
 export QUERY_USER_PROFILE_HTTP_URL="http://127.0.0.1:8081/api/queryUserProfile"
 export QUERY_USER_PROFILE_BIZ_CODE="business_platform"
 PORT=8090 sh start.sh
 ```
 
-如果没有配置 `QUERY_USER_PROFILE_HTTP_URL`，本地接口会查询 `mock-data/profiles.json` 和 `mock-data/merchant_profiles.json`。查不到 ID 时，会返回可用的离线样例 ID。
+如果需要使用 `krpc` profile 连接真实 KESS/KRPC 服务，可在公司网络环境下运行：
 
-## 导入商家画像 CSV
+```bash
+cd java-rpc-adapter
+mvn spring-boot:run \
+  -Dspring-boot.run.profiles=krpc \
+  -Dspring-boot.run.jvmArguments="--add-exports=java.base/sun.net.util=ALL-UNNAMED"
+```
+
+说明：真实 KRPC 调用依赖公司内网、KESS 配置、服务权限和正确的数据环境。GitHub 公开演示建议使用默认离线样例。
+
+## 环境变量
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `PORT` | `8090` | Node Demo 监听端口 |
+| `HOST` | `127.0.0.1` | Node Demo 监听地址 |
+| `QUERY_USER_PROFILE_HTTP_URL` | 空 | 配置后 Node 会把查询转发到真实 HTTP Adapter |
+| `QUERY_USER_PROFILE_BIZ_CODE` | `business_platform` | 默认业务标识 |
+| `QUERY_USER_PROFILE_TOKEN` | 空 | 转发到上游时附带 Bearer Token |
+| `QUERY_USER_PROFILE_COOKIE` | 空 | 转发到上游时附带 Cookie |
+| `QUERY_USER_PROFILE_TIMEOUT_MS` | `8000` | 上游请求超时时间 |
+
+## 数据导入
+
+如果有本地 CSV，可以把商家画像导入成离线 JSON：
 
 ```bash
 python3 scripts/import_merchant_profiles.py \
-  /Users/coconutye/Desktop/merchant_profile_20260630.csv \
+  /path/to/merchant_profile.csv \
   mock-data/merchant_profiles.json
 ```
 
-当前 GitHub 版本不提交真实商家画像明细，只保留脱敏样例。若需要在本地演示完整离线商家画像，可用上述脚本重新导入 CSV；导入后，`user_role=1` 的查询会优先从 `mock-data/merchant_profiles.json` 按 `merchant_id` 命中。
+为了便于公开展示，仓库默认只提交脱敏样例数据，不提交真实业务明细。
 
-## Java/KRPC 依赖
+## 面试展示建议
 
-```xml
-<dependency>
-  <groupId>kuaishou</groupId>
-  <artifactId>ad-industry-ai-studio-center-parent</artifactId>
-  <version>1.0.234</version>
-</dependency>
-<dependency>
-  <groupId>kuaishou</groupId>
-  <artifactId>ad-industry-ai-studio-center-client</artifactId>
-  <version>1.0.234</version>
-</dependency>
-```
+推荐给面试官的使用方式：
 
-```java
-private KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService userProfileService;
-```
+1. 打开 GitHub 仓库，先阅读项目目标和架构。
+2. 本地执行 `sh start.sh`，访问 `http://127.0.0.1:8090`。
+3. 体验搜索、筛选、画像详情和右侧实时查询。
+4. 查看 `server.js` 理解 Node 同源代理和离线兜底。
+5. 查看 `java-rpc-adapter/` 理解前端如何通过 HTTP Adapter 间接接入 KRPC。
 
-Adapter 工程见：
+## 当前状态
 
-```text
-java-rpc-adapter/pom.xml
-java-rpc-adapter/src/main/java/com/kuaishou/demo/profile/adapter/
-java-rpc-adapter/README.md
-```
-
-默认 Adapter 使用 mock client，能先验证 HTTP 链路。真实接入时，只需要在 `KrpcUserProfileClient` 中按公司生成包名和注入方式补齐 `QueryUserProfile` 调用。
+- 本地离线 Demo：可直接运行。
+- Node API 代理：已实现。
+- Java HTTP Adapter：已实现。
+- KRPC 接入：保留公司内网环境下的适配代码和配置。
+- 公开数据：仅包含脱敏 mock 数据，适合 GitHub 展示。

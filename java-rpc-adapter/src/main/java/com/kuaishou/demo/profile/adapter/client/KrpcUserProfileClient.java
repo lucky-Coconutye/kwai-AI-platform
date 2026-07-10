@@ -1,7 +1,7 @@
 package com.kuaishou.demo.profile.adapter.client;
 
 import com.kuaishou.ad.industry.ai.studio.center.protobuf.BaseResponseInfo;
-import com.kuaishou.ad.industry.ai.studio.center.protobuf.KrpcAdAiStudioUserProfileServiceGrpc;
+import com.kuaishou.ad.industry.ai.studio.center.protobuf.AdAiStudioUserProfileServiceGrpc;
 import com.kuaishou.ad.industry.ai.studio.center.protobuf.MerchantProfileInfo;
 import com.kuaishou.ad.industry.ai.studio.center.protobuf.QueryUserProfileRequest;
 import com.kuaishou.ad.industry.ai.studio.center.protobuf.QueryUserProfileResponse;
@@ -19,11 +19,11 @@ import org.springframework.stereotype.Component;
 @Profile("krpc")
 public class KrpcUserProfileClient implements UserProfileClient {
 
-    private final ObjectProvider<KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService> serviceProvider;
+    private final ObjectProvider<AdAiStudioUserProfileServiceGrpc.AdAiStudioUserProfileServiceFutureClient> serviceProvider;
     private final String defaultBizCode;
 
     public KrpcUserProfileClient(
-            ObjectProvider<KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService> serviceProvider,
+            ObjectProvider<AdAiStudioUserProfileServiceGrpc.AdAiStudioUserProfileServiceFutureClient> serviceProvider,
             @Value("${profile.adapter.biz-code:business_platform}") String defaultBizCode
     ) {
         this.serviceProvider = serviceProvider;
@@ -32,7 +32,7 @@ public class KrpcUserProfileClient implements UserProfileClient {
 
     @Override
     public Map<String, Object> query(QueryUserProfileHttpRequest request) {
-        KrpcAdAiStudioUserProfileServiceGrpc.IAdAiStudioUserProfileService userProfileService =
+        AdAiStudioUserProfileServiceGrpc.AdAiStudioUserProfileServiceFutureClient userProfileService =
                 serviceProvider.getIfAvailable();
         if (userProfileService == null) {
             return missingServiceBeanResponse(request);
@@ -45,7 +45,7 @@ public class KrpcUserProfileClient implements UserProfileClient {
                 .build();
 
         try {
-            QueryUserProfileResponse rpcResponse = userProfileService.queryUserProfile(rpcRequest);
+            QueryUserProfileResponse rpcResponse = userProfileService.queryUserProfile(rpcRequest).get();
             return toResponseMap(rpcResponse);
         } catch (Exception error) {
             return rpcCallFailedResponse(request, error);
@@ -136,7 +136,7 @@ public class KrpcUserProfileClient implements UserProfileClient {
         return failedResponse(
                 request,
                 "KRPC_SERVICE_BEAN_MISSING",
-                "未找到 IAdAiStudioUserProfileService Bean。krpc profile 下 Adapter 会默认尝试创建该 Bean；如果仍失败，请检查 KRPC 依赖和 Spring 配置是否加载。"
+                "未找到 AdAiStudioUserProfileServiceFutureClient Bean。krpc profile 下 Adapter 会默认尝试创建该 Bean；如果仍失败，请检查 KRPC 依赖和 Spring 配置是否加载。"
         );
     }
 
@@ -144,7 +144,7 @@ public class KrpcUserProfileClient implements UserProfileClient {
         return failedResponse(
                 request,
                 "KRPC_CALL_FAILED",
-                "已创建 IAdAiStudioUserProfileService Bean，但调用 QueryUserProfile 失败：" + error.getClass().getSimpleName() + ": " + error.getMessage()
+                "已创建 AdAiStudioUserProfileServiceFutureClient Bean，但调用 QueryUserProfile 失败：" + error.getClass().getSimpleName() + ": " + error.getMessage()
         );
     }
 
